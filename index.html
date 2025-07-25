@@ -94,7 +94,7 @@
     );
 
     const current = {};
-    let years = [2025];
+    let years = [];
     const months = [
       { label: "JAN", value: "01" }, { label: "FEB", value: "02" }, { label: "MAR", value: "03" },
       { label: "APR", value: "04" }, { label: "MAY", value: "05" }, { label: "JUN", value: "06" },
@@ -102,32 +102,59 @@
       { label: "OCT", value: "10" }, { label: "NOV", value: "11" }, { label: "DEC", value: "12" }
     ];
 
-function renderYear() {
-  const container = document.getElementById('year-list');
-  container.innerHTML = '';
-  years.forEach(y => {
-    const btn = document.createElement('div');
-    btn.className = 'btn';
-    btn.innerText = y;
-    btn.onclick = () => {
-      current.year = y;
-      document.getElementById('step-month').style.display = 'block';
-      renderMonth();
-    };
-    container.appendChild(btn);
-  });
-}
+    async function fetchYearsFromSupabase() {
+      const { data, error } = await supabase
+        .from("flights")
+        .select("flight_date");
 
-function addYear() {
-  const y = document.getElementById('new-year').value.trim();
-  if (y && !years.includes(parseInt(y))) {
-    years.push(parseInt(y));
-    renderYear();
-    document.getElementById('new-year').value = '';
-  }
-}
+      if (data) {
+        const allYears = data.map(f => new Date(f.flight_date).getFullYear());
+        years = [...new Set(allYears)].sort();
+        renderYear();
+      }
+    }
 
-renderYear();
+    function renderYear() {
+      const container = document.getElementById('year-list');
+      container.innerHTML = '';
+      years.forEach(y => {
+        const btn = document.createElement('div');
+        btn.className = 'btn';
+        btn.innerText = y;
+        btn.onclick = () => {
+          current.year = y;
+          document.getElementById('step-month').style.display = 'block';
+          renderMonth();
+        };
+        container.appendChild(btn);
+      });
+    }
+
+    async function addYear() {
+      const y = document.getElementById('new-year').value.trim();
+      const yearInt = parseInt(y);
+      if (!y || years.includes(yearInt)) return;
+
+      // Insert dummy flight to mark the year
+      const flightDate = `${yearInt}-01-01`;
+      const dummy = {
+        flight_no: `DUMMY-${Date.now()}`,
+        flight_date: flightDate,
+        origin: "DMK",
+        destination: "CGK",
+        std: "00:00:00"
+      };
+
+      const { error } = await supabase.from("flights").insert(dummy);
+      if (!error) {
+        years.push(yearInt);
+        years.sort();
+        renderYear();
+        document.getElementById('new-year').value = '';
+      } else {
+        alert("❌ Failed to add year");
+      }
+    }
 
     function renderMonth() {
       const container = document.getElementById('month-list');
@@ -177,7 +204,7 @@ renderYear();
       }
 
       const flights = (data || []).map(f => f.flight_no);
-      flights.forEach((flight, index) => {
+      flights.forEach((flight) => {
         const wrapper = document.createElement('div');
         wrapper.style.display = 'inline-flex';
         wrapper.style.alignItems = 'center';
@@ -221,8 +248,7 @@ renderYear();
       }
     }
 
-    renderYear();
+    fetchYearsFromSupabase();
   </script>
-
 </body>
 </html>
