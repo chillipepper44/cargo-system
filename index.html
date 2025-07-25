@@ -88,7 +88,7 @@
   </div>
 
   <script>
-    const supabase = supabase.createClient(
+    const sb = supabase.createClient(
       'https://xgaforpzjrievucwlgla.supabase.co',
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhnYWZvcnB6anJpZXZ1Y3dsZ2xhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM0NTEyMDQsImV4cCI6MjA2OTAyNzIwNH0.QPUOtbCPdxrqiWr93yp7FsxznzSyA_Je1oF4D65rzXs'
     );
@@ -103,10 +103,7 @@
     ];
 
     async function fetchYearsFromSupabase() {
-      const { data, error } = await supabase
-        .from("flights")
-        .select("flight_date");
-
+      const { data } = await sb.from("flights").select("flight_date");
       if (data) {
         const allYears = data.map(f => new Date(f.flight_date).getFullYear());
         years = [...new Set(allYears)].sort();
@@ -135,7 +132,6 @@
       const yearInt = parseInt(y);
       if (!y || years.includes(yearInt)) return;
 
-      // Insert dummy flight to mark the year
       const flightDate = `${yearInt}-01-01`;
       const dummy = {
         flight_no: `DUMMY-${Date.now()}`,
@@ -145,14 +141,15 @@
         std: "00:00:00"
       };
 
-      const { error } = await supabase.from("flights").insert(dummy);
+      const { error } = await sb.from("flights").insert(dummy);
       if (!error) {
         years.push(yearInt);
         years.sort();
         renderYear();
         document.getElementById('new-year').value = '';
+        alert("✅ Year added!");
       } else {
-        alert("❌ Failed to add year");
+        alert("❌ Failed: " + error.message);
       }
     }
 
@@ -193,7 +190,7 @@
       const container = document.getElementById('flight-list');
       container.innerHTML = '';
 
-      const { data, error } = await supabase
+      const { data, error } = await sb
         .from("flights")
         .select("flight_no")
         .eq("flight_date", `${current.year}-${current.month.value}-${current.day}`);
@@ -204,7 +201,7 @@
       }
 
       const flights = (data || []).map(f => f.flight_no);
-      flights.forEach((flight) => {
+      flights.forEach(flight => {
         const wrapper = document.createElement('div');
         wrapper.style.display = 'inline-flex';
         wrapper.style.alignItems = 'center';
@@ -228,16 +225,12 @@
       if (!flight) return;
 
       const flightDate = `${current.year}-${current.month.value}-${current.day}`;
-      const origin = "DMK";
-      const destination = "CGK";
-      const std = "00:00:00";
-
-      const { error } = await supabase.from("flights").insert({
+      const { error } = await sb.from("flights").insert({
         flight_no: flight,
         flight_date: flightDate,
-        origin,
-        destination,
-        std
+        origin: "DMK",
+        destination: "CGK",
+        std: "00:00:00"
       });
 
       if (!error) {
@@ -250,5 +243,6 @@
 
     fetchYearsFromSupabase();
   </script>
+
 </body>
 </html>
