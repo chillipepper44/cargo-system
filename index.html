@@ -103,7 +103,7 @@
       <div id="flight-list"></div>
       <input type="text" id="new-flight" placeholder="Flight No." />
       <input type="text" id="new-destination" placeholder="Destination (e.g. CGK)" />
-      <input type="time" id="new-std" />
+      <input type="time" id="new-std" step="1" />
       <button onclick="addFlight()">+ Add Flight</button>
     </div>
   </div>
@@ -113,7 +113,7 @@
     <h3>Edit Flight</h3>
     <label>Flight No: <input id="edit-flight-no" /></label><br><br>
     <label>Destination: <input id="edit-destination" /></label><br><br>
-    <label>STD (HH:MM:SS): <input id="edit-std" type="time" /></label><br><br>
+    <label>STD (HH:MM:SS): <input id="edit-std" type="time" step="1" /></label><br><br>
     <button onclick="saveFlightEdit()">💾 Save</button>
     <button onclick="closeFlightEdit()">✖️ Cancel</button>
   </div>
