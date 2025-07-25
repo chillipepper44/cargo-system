@@ -102,30 +102,32 @@
       { label: "OCT", value: "10" }, { label: "NOV", value: "11" }, { label: "DEC", value: "12" }
     ];
 
-    function renderYear() {
-      const container = document.getElementById('year-list');
-      container.innerHTML = '';
-      years.forEach(y => {
-        const btn = document.createElement('div');
-        btn.className = 'btn';
-        btn.innerText = y;
-        btn.onclick = () => {
-          current.year = y;
-          document.getElementById('step-month').style.display = 'block';
-          renderMonth();
-        };
-        container.appendChild(btn);
-      });
-    }
+function renderYear() {
+  const container = document.getElementById('year-list');
+  container.innerHTML = '';
+  years.forEach(y => {
+    const btn = document.createElement('div');
+    btn.className = 'btn';
+    btn.innerText = y;
+    btn.onclick = () => {
+      current.year = y;
+      document.getElementById('step-month').style.display = 'block';
+      renderMonth();
+    };
+    container.appendChild(btn);
+  });
+}
 
-    function addYear() {
-      const y = document.getElementById('new-year').value.trim();
-      if (y && !years.includes(parseInt(y))) {
-        years.push(parseInt(y));
-        renderYear();
-        document.getElementById('new-year').value = '';
-      }
-    }
+function addYear() {
+  const y = document.getElementById('new-year').value.trim();
+  if (y && !years.includes(parseInt(y))) {
+    years.push(parseInt(y));
+    renderYear();
+    document.getElementById('new-year').value = '';
+  }
+}
+
+renderYear();
 
     function renderMonth() {
       const container = document.getElementById('month-list');
