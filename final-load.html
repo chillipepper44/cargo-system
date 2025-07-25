@@ -61,13 +61,10 @@
       border-radius: 6px;
     }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
-<button onclick="history.back()" style="margin-bottom: 10px;">
-  🔙 Back
-</button>
-
 <body>
-
+  <button onclick="history.back()" style="margin-bottom: 10px;">🔙 Back</button>
   <h1>Final Load Entry</h1>
   <div class="info-box" id="flight-info">Loading flight info...</div>
 
@@ -80,7 +77,16 @@
 
   <div id="uldArea"></div>
 
+  <button onclick="goToSummary()">📊 View Summary Report</button>
+  <button onclick="saveToSupabase()">💾 Save to Supabase</button>
+
   <script>
+    const { createClient } = supabase;
+    const supabase = createClient(
+      'https://xgaforpzjrievucwlgla.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhnYWZvcnB6anJpZXZ1Y3dsZ2xhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM0NTEyMDQsImV4cCI6MjA2OTAyNzIwNH0.QPUOtbCPdxrqiWr93yp7FsxznzSyA_Je1oF4D65rzXs'
+    );
+
     const params = new URLSearchParams(window.location.search);
     const flightInfo = {
       year: params.get('year'),
@@ -115,72 +121,6 @@
       document.getElementById('qty').value = '';
       document.getElementById('weight').value = '';
     }
-
-    function deleteULD(uldNo) {
-      if (confirm(`Delete entire ULD ${uldNo}?`)) {
-        delete uldMap[uldNo];
-        renderULDs();
-      }
-    }
-
-    function deleteAWB(uldNo, index) {
-      if (confirm("Delete this AWB?")) {
-        uldMap[uldNo].splice(index, 1);
-        if (uldMap[uldNo].length === 0) delete uldMap[uldNo];
-        renderULDs();
-      }
-    }
-
-    function editULDName(oldUldNo) {
-      const newName = prompt("Enter new ULD No", oldUldNo);
-      if (newName && newName !== oldUldNo) {
-        uldMap[newName] = uldMap[oldUldNo];
-        delete uldMap[oldUldNo];
-        renderULDs();
-        document.getElementById('uldNo').value = newName;
-      }
-    }
-
-function editAWB(uldNo, index) {
-  const entry = uldMap[uldNo][index];
-
-  const modal = document.createElement('div');
-  modal.id = 'awb-edit-modal'; // ✅ เพิ่ม id ให้ modal
-  modal.style.position = 'fixed';
-  modal.style.top = '30%';
-  modal.style.left = '50%';
-  modal.style.transform = 'translate(-50%, -30%)';
-  modal.style.background = '#fff';
-  modal.style.border = '1px solid #ccc';
-  modal.style.padding = '16px';
-  modal.style.zIndex = 1000;
-  modal.innerHTML = `
-    <div style="font-family:Segoe UI;">
-      <label>AWB No: <input id="edit-awb" value="${entry.awbNo}" /></label><br/>
-      <label>PCS: <input id="edit-qty" type="number" value="${entry.qty}" /></label><br/>
-      <label>Weight (kg): <input id="edit-weight" type="number" value="${entry.weight}" /></label><br/><br/>
-      <button onclick="applyEdit('${uldNo}', ${index})">Save</button>
-      <button onclick="document.body.removeChild(this.parentNode.parentNode)">Cancel</button>
-    </div>
-  `;
-  document.body.appendChild(modal);
-}
-
-function applyEdit(uldNo, index) {
-  const awb = document.getElementById('edit-awb').value.trim();
-  const qty = document.getElementById('edit-qty').value.trim();
-  const weight = document.getElementById('edit-weight').value.trim();
-
-  if (awb) uldMap[uldNo][index].awbNo = awb;
-  if (qty) uldMap[uldNo][index].qty = qty;
-  if (weight) uldMap[uldNo][index].weight = weight;
-
-  // ✅ ปิด modal แบบตรงไปตรงมา
-  const modal = document.getElementById('awb-edit-modal');
-  if (modal) document.body.removeChild(modal);
-
-  renderULDs();
-}
 
     function renderULDs() {
       const area = document.getElementById('uldArea');
@@ -220,111 +160,128 @@ function applyEdit(uldNo, index) {
         area.appendChild(block);
       });
     }
-  </script>
-<button onclick="goToSummary()">📊 View Summary Report</button>
 
-<script>
-  function goToSummary() {
-    const flightInfo = {
-      flightNo: 'QZ 253',
-      from: 'DMK',
-      to: 'CGK',
-      date: '25/07/2025',
-      std: '00:20:40',
-    };
-
-    const uldList = [
-      {
-        uldNo: "BC-148",
-        mawb: "900-1131 3831",
-        quantity: 36,
-        grossWeight: 274.00,
-        destination: "CGK",
-        shc: "0.00"
-      },
-      {
-        uldNo: "BC-168",
-        mawb: "900-1131 3831",
-        quantity: 40,
-        grossWeight: 304.00,
-        destination: "CGK",
-        shc: "0.00"
-      }
-    ];
-
-    localStorage.setItem('flightInfo', JSON.stringify(flightInfo));
-    localStorage.setItem('uldData', JSON.stringify(uldList));
-    window.location.href = 'cargo-summary.html';
-  }
-</script>
-
-<button onclick="saveToSupabase()">💾 Save to Supabase</button>
-
-<script>
-  async function saveToSupabase() {
-    // 1. บันทึกเที่ยวบิน
-    const { flight, day, monthText, year, std } = flightInfo;
-    const origin = "DMK";
-    const destination = "CGK";
-    const flightDate = `${year}-${monthTextToNumber(monthText)}-${day.padStart(2, '0')}`;
-    const stdTime = std || "00:00:00";
-
-    const flightRes = await supabase.from("flights").insert({
-      flight_no: flight,
-      flight_date: flightDate,
-      origin,
-      destination,
-      std: stdTime
-    }).select();
-
-    const flightId = flightRes.data?.[0]?.id;
-    if (!flightId) return alert("❌ Failed to save flight.");
-
-    // 2. บันทึก ULD และ AWB
-    for (const uldNo in uldMap) {
-      const uldRes = await supabase.from("ulds").insert({
-        flight_id: flightId,
-        uld_no: uldNo,
-        reg: "", // ใส่ภายหลังถ้ามี
-        shc: ""
-      }).select();
-
-      const uldId = uldRes.data?.[0]?.id;
-      if (!uldId) continue;
-
-      for (const awb of uldMap[uldNo]) {
-        await supabase.from("awbs").insert({
-          uld_id: uldId,
-          awb_no: awb.awbNo,
-          pcs: parseInt(awb.qty),
-          weight: parseFloat(awb.weight),
-          destination: destination,
-          part: "",
-          shc: ""
-        });
+    function editULDName(oldUldNo) {
+      const newName = prompt("Enter new ULD No", oldUldNo);
+      if (newName && newName !== oldUldNo) {
+        uldMap[newName] = uldMap[oldUldNo];
+        delete uldMap[oldUldNo];
+        renderULDs();
+        document.getElementById('uldNo').value = newName;
       }
     }
 
-    alert("✅ Saved all data to Supabase!");
-  }
+    function deleteULD(uldNo) {
+      if (confirm(`Delete entire ULD ${uldNo}?`)) {
+        delete uldMap[uldNo];
+        renderULDs();
+      }
+    }
 
-  function monthTextToNumber(text) {
-    const map = {
-      JAN: "01", FEB: "02", MAR: "03", APR: "04", MAY: "05", JUN: "06",
-      JUL: "07", AUG: "08", SEP: "09", OCT: "10", NOV: "11", DEC: "12"
-    };
-    return map[text.toUpperCase()] || "01";
-  }
-</script>
+    function deleteAWB(uldNo, index) {
+      if (confirm("Delete this AWB?")) {
+        uldMap[uldNo].splice(index, 1);
+        if (uldMap[uldNo].length === 0) delete uldMap[uldNo];
+        renderULDs();
+      }
+    }
 
-<!-- Supabase Client -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script>
-  const supabase = createClient(
-    'https://xgaforpzjrievucwlgla.supabase.co',
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhnYWZvcnB6anJpZXZ1Y3dsZ2xhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM0NTEyMDQsImV4cCI6MjA2OTAyNzIwNH0.QPUOtbCPdxrqiWr93yp7FsxznzSyA_Je1oF4D65rzXs'
-  );
-</script>
+    function editAWB(uldNo, index) {
+      const entry = uldMap[uldNo][index];
+      const modal = document.createElement('div');
+      modal.id = 'awb-edit-modal';
+      modal.style.position = 'fixed';
+      modal.style.top = '30%';
+      modal.style.left = '50%';
+      modal.style.transform = 'translate(-50%, -30%)';
+      modal.style.background = '#fff';
+      modal.style.border = '1px solid #ccc';
+      modal.style.padding = '16px';
+      modal.style.zIndex = 1000;
+      modal.innerHTML = `
+        <div style="font-family:Segoe UI;">
+          <label>AWB No: <input id="edit-awb" value="${entry.awbNo}" /></label><br/>
+          <label>PCS: <input id="edit-qty" type="number" value="${entry.qty}" /></label><br/>
+          <label>Weight (kg): <input id="edit-weight" type="number" value="${entry.weight}" /></label><br/><br/>
+          <button onclick="applyEdit('${uldNo}', ${index})">Save</button>
+          <button onclick="document.body.removeChild(this.parentNode.parentNode)">Cancel</button>
+        </div>
+      `;
+      document.body.appendChild(modal);
+    }
 
+    function applyEdit(uldNo, index) {
+      const awb = document.getElementById('edit-awb').value.trim();
+      const qty = document.getElementById('edit-qty').value.trim();
+      const weight = document.getElementById('edit-weight').value.trim();
+
+      if (awb) uldMap[uldNo][index].awbNo = awb;
+      if (qty) uldMap[uldNo][index].qty = qty;
+      if (weight) uldMap[uldNo][index].weight = weight;
+
+      const modal = document.getElementById('awb-edit-modal');
+      if (modal) document.body.removeChild(modal);
+      renderULDs();
+    }
+
+    function goToSummary() {
+      localStorage.setItem('flightInfo', JSON.stringify(flightInfo));
+      localStorage.setItem('uldData', JSON.stringify(uldMap));
+      window.location.href = 'cargo-summary.html';
+    }
+
+    async function saveToSupabase() {
+      const { flight, day, monthText, year, std } = flightInfo;
+      const origin = "DMK";
+      const destination = "CGK";
+      const flightDate = `${year}-${monthTextToNumber(monthText)}-${day.padStart(2, '0')}`;
+      const stdTime = std || "00:00:00";
+
+      const flightRes = await supabase.from("flights").insert({
+        flight_no: flight,
+        flight_date: flightDate,
+        origin,
+        destination,
+        std: stdTime
+      }).select();
+
+      const flightId = flightRes.data?.[0]?.id;
+      if (!flightId) return alert("❌ Failed to save flight.");
+
+      for (const uldNo in uldMap) {
+        const uldRes = await supabase.from("ulds").insert({
+          flight_id: flightId,
+          uld_no: uldNo,
+          reg: "",
+          shc: ""
+        }).select();
+
+        const uldId = uldRes.data?.[0]?.id;
+        if (!uldId) continue;
+
+        for (const awb of uldMap[uldNo]) {
+          await supabase.from("awbs").insert({
+            uld_id: uldId,
+            awb_no: awb.awbNo,
+            pcs: parseInt(awb.qty),
+            weight: parseFloat(awb.weight),
+            destination: destination,
+            part: "",
+            shc: ""
+          });
+        }
+      }
+
+      alert("✅ Saved all data to Supabase!");
+    }
+
+    function monthTextToNumber(text) {
+      const map = {
+        JAN: "01", FEB: "02", MAR: "03", APR: "04", MAY: "05", JUN: "06",
+        JUL: "07", AUG: "08", SEP: "09", OCT: "10", NOV: "11", DEC: "12"
+      };
+      return map[text.toUpperCase()] || "01";
+    }
+  </script>
 </body>
 </html>
