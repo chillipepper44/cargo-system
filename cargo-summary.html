@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Cargo Summary Report (TXT Style)</title>
+  <meta charset="UTF-8">
+  <title>Cargo Summary Report</title>
   <style>
     body {
       font-family: monospace;
@@ -33,89 +33,98 @@
       }
     }
   </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
   <button onclick="window.print()">🖨️ Print</button>
   <button onclick="savePDF()">💾 Save as PDF</button>
-  <button onclick="exportTXT()">📄 Export TXT</button>
 
-  <pre id="report"></pre>
+  <pre id="report">Loading...</pre>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
   <script>
-    // Mock flight + ULD data
-    const flightInfo = {
-      flightNo: 'QZ 253',
-      from: 'DMK',
-      to: 'CGK',
-      date: '25/07/2025',
-      std: '00:20:40',
-    };
+    const supabase = supabase.createClient(
+      'https://xgaforpzjrievucwlgla.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhnYWZvcnB6anJpZXZ1Y3dsZ2xhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM0NTEyMDQsImV4cCI6MjA2OTAyNzIwNH0.QPUOtbCPdxrqiWr93yp7FsxznzSyA_Je1oF4D65rzXs'
+    );
 
-    const uldData = [
-      {
-        uldNo: "BC-148",
-        mawb: "900-1131 3831",
-        quantity: 36,
-        grossWeight: 274.00,
-        destination: "CGK",
-        shc: "VAL"
-      },
-      {
-        uldNo: "BC-168",
-        mawb: "900-1131 4444",
-        quantity: 40,
-        grossWeight: 300.00,
-        destination: "CGK",
-        shc: "PER"
-      }
-    ];
-
-    function formatLine(text, width) {
+    function format(text, width) {
       return text.toString().padEnd(width, ' ');
     }
 
-    function renderReportText() {
-      let report = '';
+    async function loadReport() {
+      const info = JSON.parse(localStorage.getItem('flightInfo'));
+      if (!info) return;
 
-      report += formatLine(`${flightInfo.flightNo}`, 16) + formatLine(`${flightInfo.from}`, 8) + `${flightInfo.to}\n`;
-      report += formatLine(`${flightInfo.date} ${flightInfo.std}`, 24) + `${flightInfo.date} ${flightInfo.std}\n\n`;
+      const flight_date = `${info.year}-${info.month}-${info.day}`;
+      const flight_no = info.flight;
 
-      report += formatLine('MawbNo', 20)
-              + formatLine('Quantity', 10)
-              + formatLine('GrossWeigh', 12)
-              + formatLine('DestPortShipmen', 18)
-              + formatLine('Get Weight', 12)
-              + 'SHC\n\n';
+      const { data: flightData } = await supabase
+        .from("flights")
+        .select("*")
+        .eq("flight_no", flight_no)
+        .eq("flight_date", flight_date)
+        .limit(1);
+
+      if (!flightData || flightData.length === 0) {
+        document.getElementById('report').innerText = "❌ Flight not found.";
+        return;
+      }
+
+      const flight = flightData[0];
+      const std = flight.std || '00:00:00';
+      const from = flight.origin || 'DMK';
+      const to = flight.destination || 'XXX';
+
+      const { data: ulds } = await supabase
+        .from("ulds")
+        .select("id, uld_no, awbs(*)")
+        .eq("flight_id", flight.id);
+
+      let output = '';
+      output += format(`${flight.flight_no}`, 16) + format(from, 8) + to + '\n';
+      output += format(`${flight_date} ${std}`, 24) + `${flight_date} ${std}\n\n`;
+
+      output += format("MawbNo", 18)
+              + format("Quantity", 10)
+              + format("GrossWeigh", 12)
+              + format("DestPortShipmen", 18)
+              + format("Get Weight", 12)
+              + "SHC\n\n";
 
       let totalULD = 0;
       let totalPCS = 0;
       let totalWeight = 0;
 
-      uldData.forEach(uld => {
-        report += `ULD NO ${uld.uldNo}\n`;
-        report += '  ' +
-          formatLine(uld.mawb, 18) +
-          formatLine(uld.quantity, 10) +
-          formatLine(uld.grossWeight.toFixed(2), 12) +
-          formatLine(uld.destination, 18) +
-          formatLine('0.00', 12) +
-          uld.shc + '\n\n';
+      for (const uld of ulds) {
+        output += `ULD NO ${uld.uld_no}\n`;
 
+        for (const awb of uld.awbs) {
+          output += '  ' +
+            format(awb.awb_no, 18) +
+            format(awb.pcs || 0, 10) +
+            format((awb.weight || 0).toFixed(2), 12) +
+            format(awb.destination || '', 18) +
+            format('0.00', 12) +
+            (awb.shc || '') + '\n';
+
+          totalPCS += awb.pcs || 0;
+          totalWeight += awb.weight || 0;
+        }
+
+        output += '\n';
         totalULD++;
-        totalPCS += uld.quantity;
-        totalWeight += uld.grossWeight;
-      });
+      }
 
-      report += `TOTAL ULD : ${totalULD}`.padEnd(24)
-              + formatLine(totalPCS, 10)
-              + formatLine(totalWeight.toFixed(2), 12)
-              + formatLine('', 18)
-              + formatLine('0.00', 12);
+      output += `TOTAL ULD : ${totalULD}`.padEnd(24)
+              + format(totalPCS, 10)
+              + format(totalWeight.toFixed(2), 12)
+              + format('', 18)
+              + format('0.00', 12);
 
-      document.getElementById('report').textContent = report;
+      document.getElementById('report').innerText = output;
     }
 
     function savePDF() {
@@ -125,28 +134,11 @@
       doc.setFont("Courier", "normal");
       doc.setFontSize(10);
       doc.text(text, 10, 10);
-      doc.save(`Cargo_Summary_${flightInfo.flightNo}.pdf`);
+      doc.save("Cargo_Summary.pdf");
     }
 
-    function exportTXT() {
-      const text = document.getElementById("report").textContent;
-      const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.download = `Cargo_Summary_${flightInfo.flightNo}.txt`;
-      link.click();
-    }
-
-    renderReportText();
+    loadReport();
   </script>
-<!-- Supabase Client -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script>
-  const supabase = createClient(
-    'https://xgaforpzjrievucwlgla.supabase.co',
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhnYWZvcnB6anJpZXZ1Y3dsZ2xhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM0NTEyMDQsImV4cCI6MjA2OTAyNzIwNH0.QPUOtbCPdxrqiWr93yp7FsxznzSyA_Je1oF4D65rzXs'
-  );
-</script>
 
 </body>
 </html>

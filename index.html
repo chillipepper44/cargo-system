@@ -51,6 +51,7 @@
       background: #1e3d7b;
     }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -87,6 +88,11 @@
   </div>
 
   <script>
+    const supabase = supabase.createClient(
+      'https://xgaforpzjrievucwlgla.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhnYWZvcnB6anJpZXZ1Y3dsZ2xhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM0NTEyMDQsImV4cCI6MjA2OTAyNzIwNH0.QPUOtbCPdxrqiWr93yp7FsxznzSyA_Je1oF4D65rzXs'
+    );
+
     const current = {};
     let years = [2025];
     const months = [
@@ -95,7 +101,6 @@
       { label: "JUL", value: "07" }, { label: "AUG", value: "08" }, { label: "SEP", value: "09" },
       { label: "OCT", value: "10" }, { label: "NOV", value: "11" }, { label: "DEC", value: "12" }
     ];
-    let flights = ["SL116", "QZ253", "TG123"];
 
     function renderYear() {
       const container = document.getElementById('year-list');
@@ -149,54 +154,68 @@
         btn.onclick = () => {
           current.day = day;
           document.getElementById('step-flight').style.display = 'block';
-          renderFlightList();
+          loadFlightsFromSupabase();
         };
         container.appendChild(btn);
       }
     }
 
-    function renderFlightList() {
+    async function loadFlightsFromSupabase() {
       const container = document.getElementById('flight-list');
       container.innerHTML = '';
+
+      const { data, error } = await supabase
+        .from("flights")
+        .select("flight_no")
+        .eq("flight_date", `${current.year}-${current.month.value}-${current.day}`);
+
+      if (error) {
+        container.innerHTML = '<div style="color:red">Failed to load flights.</div>';
+        return;
+      }
+
+      const flights = (data || []).map(f => f.flight_no);
       flights.forEach((flight, index) => {
         const wrapper = document.createElement('div');
         wrapper.style.display = 'inline-flex';
         wrapper.style.alignItems = 'center';
         wrapper.style.margin = '6px';
 
-    const btn = document.createElement('div');
-    btn.className = 'btn';
-    btn.innerText = flight;
-    btn.onclick = () => {
-      const url = `final-load.html?year=${current.year}&month=${current.month.value}&monthText=${current.month.label}&day=${current.day}&flight=${flight}`;
-      window.location.href = url;
-    };
+        const btn = document.createElement('div');
+        btn.className = 'btn';
+        btn.innerText = flight;
+        btn.onclick = () => {
+          const url = `final-load.html?year=${current.year}&month=${current.month.value}&monthText=${current.month.label}&day=${current.day}&flight=${flight}`;
+          window.location.href = url;
+        };
 
-    const delBtn = document.createElement('button');
-    delBtn.style.marginLeft = '8px';
-    delBtn.style.background = '#e74c3c';
-    delBtn.style.fontSize = '13px';
-    delBtn.innerText = '🗑️';
-    delBtn.onclick = () => {
-      if (confirm(`Delete flight ${flight}?`)) {
-        flights.splice(index, 1);
-        renderFlightList();
-      }
-    };
+        wrapper.appendChild(btn);
+        container.appendChild(wrapper);
+      });
+    }
 
-    wrapper.appendChild(btn);
-    wrapper.appendChild(delBtn);
-    container.appendChild(wrapper);
-  });
-}
-
-
-    function addFlight() {
+    async function addFlight() {
       const flight = document.getElementById('new-flight').value.trim().toUpperCase();
-      if (flight && !flights.includes(flight)) {
-        flights.push(flight);
-        renderFlightList();
+      if (!flight) return;
+
+      const flightDate = `${current.year}-${current.month.value}-${current.day}`;
+      const origin = "DMK";
+      const destination = "CGK";
+      const std = "00:00:00";
+
+      const { error } = await supabase.from("flights").insert({
+        flight_no: flight,
+        flight_date: flightDate,
+        origin,
+        destination,
+        std
+      });
+
+      if (!error) {
+        loadFlightsFromSupabase();
         document.getElementById('new-flight').value = '';
+      } else {
+        alert("❌ Failed to save flight.");
       }
     }
 
