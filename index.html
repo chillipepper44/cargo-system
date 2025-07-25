@@ -31,7 +31,8 @@
       background: #d9eaff;
     }
     input[type="text"],
-    input[type="number"] {
+    input[type="number"],
+    input[type="time"] {
       padding: 8px;
       margin: 5px;
       border: 1px solid #ccc;
@@ -49,6 +50,24 @@
     }
     button:hover {
       background: #1e3d7b;
+    }
+
+    #flight-edit-modal {
+      display: none;
+      position: fixed;
+      top: 20%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #fff;
+      padding: 20px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      z-index: 1000;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    }
+
+    #flight-edit-modal input {
+      width: 220px;
     }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -82,9 +101,21 @@
     <div class="section" id="step-flight" style="display:none">
       <h2>Select Flight Number</h2>
       <div id="flight-list"></div>
-      <input type="text" id="new-flight" placeholder="Add new flight no." />
+      <input type="text" id="new-flight" placeholder="Flight No." />
+      <input type="text" id="new-destination" placeholder="Destination (e.g. CGK)" />
+      <input type="time" id="new-std" />
       <button onclick="addFlight()">+ Add Flight</button>
     </div>
+  </div>
+
+  <!-- ✏️ Flight Edit Modal -->
+  <div id="flight-edit-modal">
+    <h3>Edit Flight</h3>
+    <label>Flight No: <input id="edit-flight-no" /></label><br><br>
+    <label>Destination: <input id="edit-destination" /></label><br><br>
+    <label>STD (HH:MM:SS): <input id="edit-std" type="time" /></label><br><br>
+    <button onclick="saveFlightEdit()">💾 Save</button>
+    <button onclick="closeFlightEdit()">✖️ Cancel</button>
   </div>
 
   <script>
@@ -95,6 +126,8 @@
 
     const current = {};
     let years = [];
+    let currentEditFlightId = null;
+
     const months = [
       { label: "JAN", value: "01" }, { label: "FEB", value: "02" }, { label: "MAR", value: "03" },
       { label: "APR", value: "04" }, { label: "MAY", value: "05" }, { label: "JUN", value: "06" },
@@ -147,7 +180,6 @@
         years.sort();
         renderYear();
         document.getElementById('new-year').value = '';
-        alert("✅ Year added!");
       } else {
         alert("❌ Failed: " + error.message);
       }
@@ -190,18 +222,12 @@
       const container = document.getElementById('flight-list');
       container.innerHTML = '';
 
-      const { data, error } = await sb
+      const { data } = await sb
         .from("flights")
-        .select("flight_no")
+        .select("id, flight_no, destination, std")
         .eq("flight_date", `${current.year}-${current.month.value}-${current.day}`);
 
-      if (error) {
-        container.innerHTML = '<div style="color:red">Failed to load flights.</div>';
-        return;
-      }
-
-      const flights = (data || []).map(f => f.flight_no);
-      flights.forEach(flight => {
+      (data || []).forEach(flight => {
         const wrapper = document.createElement('div');
         wrapper.style.display = 'inline-flex';
         wrapper.style.alignItems = 'center';
@@ -209,19 +235,66 @@
 
         const btn = document.createElement('div');
         btn.className = 'btn';
-        btn.innerText = flight;
+        btn.innerText = flight.flight_no;
         btn.onclick = () => {
-          const url = `final-load.html?year=${current.year}&month=${current.month.value}&monthText=${current.month.label}&day=${current.day}&flight=${flight}`;
+          const url = `final-load.html?year=${current.year}&month=${current.month.value}&monthText=${current.month.label}&day=${current.day}&flight=${flight.flight_no}`;
           window.location.href = url;
         };
 
+        const del = document.createElement('button');
+        del.innerText = '🗑️';
+        del.onclick = async () => {
+          if (confirm(`Delete flight ${flight.flight_no}?`)) {
+            await sb.from("flights").delete().eq("id", flight.id);
+            loadFlightsFromSupabase();
+          }
+        };
+
+        const edit = document.createElement('button');
+        edit.innerText = '✏️';
+        edit.onclick = () => {
+          currentEditFlightId = flight.id;
+          document.getElementById("edit-flight-no").value = flight.flight_no;
+          document.getElementById("edit-destination").value = flight.destination;
+          document.getElementById("edit-std").value = flight.std?.slice(0, 5) || "00:00";
+          document.getElementById("flight-edit-modal").style.display = "block";
+        };
+
         wrapper.appendChild(btn);
+        wrapper.appendChild(edit);
+        wrapper.appendChild(del);
         container.appendChild(wrapper);
       });
     }
 
+    async function saveFlightEdit() {
+      const newNo = document.getElementById("edit-flight-no").value.trim().toUpperCase();
+      const newDest = document.getElementById("edit-destination").value.trim().toUpperCase();
+      const newSTD = document.getElementById("edit-std").value + ":00";
+
+      const { error } = await sb.from("flights").update({
+        flight_no: newNo,
+        destination: newDest,
+        std: newSTD
+      }).eq("id", currentEditFlightId);
+
+      if (!error) {
+        closeFlightEdit();
+        loadFlightsFromSupabase();
+      } else {
+        alert("❌ Failed to update flight: " + error.message);
+      }
+    }
+
+    function closeFlightEdit() {
+      document.getElementById("flight-edit-modal").style.display = "none";
+      currentEditFlightId = null;
+    }
+
     async function addFlight() {
       const flight = document.getElementById('new-flight').value.trim().toUpperCase();
+      const destination = document.getElementById('new-destination').value.trim().toUpperCase() || "XXX";
+      const std = document.getElementById('new-std').value || "00:00:00";
       if (!flight) return;
 
       const flightDate = `${current.year}-${current.month.value}-${current.day}`;
@@ -229,13 +302,15 @@
         flight_no: flight,
         flight_date: flightDate,
         origin: "DMK",
-        destination: "CGK",
-        std: "00:00:00"
+        destination,
+        std
       });
 
       if (!error) {
         loadFlightsFromSupabase();
         document.getElementById('new-flight').value = '';
+        document.getElementById('new-destination').value = '';
+        document.getElementById('new-std').value = '';
       } else {
         alert("❌ Failed to save flight.");
       }
