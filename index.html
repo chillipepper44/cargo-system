@@ -113,7 +113,7 @@
     <h3>Edit Flight</h3>
     <label>Flight No: <input id="edit-flight-no" /></label><br><br>
     <label>Destination: <input id="edit-destination" /></label><br><br>
-    <label>STD (HH:MM:SS): <input id="edit-std" type="time" step="1" /></label><br><br>
+    <label>STD (24Hr): <input id="edit-std" type="time" step="1" /></label><br><br>
     <button onclick="saveFlightEdit()">💾 Save</button>
     <button onclick="closeFlightEdit()">✖️ Cancel</button>
   </div>
@@ -134,6 +134,19 @@
       { label: "JUL", value: "07" }, { label: "AUG", value: "08" }, { label: "SEP", value: "09" },
       { label: "OCT", value: "10" }, { label: "NOV", value: "11" }, { label: "DEC", value: "12" }
     ];
+
+    function convertTo24HrFormat(timeStr) {
+      if (!timeStr) return "00:00";
+      if (/^\d{2}:\d{2}$/.test(timeStr)) return timeStr;
+
+      const [raw, ampm] = timeStr.trim().split(/ ?(AM|PM)/i);
+      let [hour, minute] = raw.split(':').map(Number);
+
+      if (ampm?.toUpperCase() === 'PM' && hour !== 12) hour += 12;
+      if (ampm?.toUpperCase() === 'AM' && hour === 12) hour = 0;
+
+      return String(hour).padStart(2, '0') + ':' + String(minute).padStart(2, '0');
+    }
 
     async function fetchYearsFromSupabase() {
       const { data } = await sb.from("flights").select("flight_date");
@@ -218,54 +231,54 @@
       }
     }
 
-async function loadFlightsFromSupabase() {
-  const container = document.getElementById('flight-list');
-  container.innerHTML = '';
+    async function loadFlightsFromSupabase() {
+      const container = document.getElementById('flight-list');
+      container.innerHTML = '';
 
-  const { data } = await sb
-    .from("flights")
-    .select("id, flight_no, destination, std")
-    .eq("flight_date", `${current.year}-${current.month.value}-${current.day}`);
+      const { data } = await sb
+        .from("flights")
+        .select("id, flight_no, destination, std")
+        .eq("flight_date", `${current.year}-${current.month.value}-${current.day}`);
 
-  (data || []).forEach(flight => {
-    const wrapper = document.createElement('div');
-    wrapper.style.display = 'inline-flex';
-    wrapper.style.alignItems = 'center';
-    wrapper.style.margin = '6px';
+      (data || []).forEach(flight => {
+        const wrapper = document.createElement('div');
+        wrapper.style.display = 'inline-flex';
+        wrapper.style.alignItems = 'center';
+        wrapper.style.margin = '6px';
 
-    const btn = document.createElement('div');
-    btn.className = 'btn';
-    btn.innerText = flight.flight_no;
-    btn.onclick = () => {
-      const url = `final-load.html?year=${current.year}&month=${current.month.value}&monthText=${current.month.label}&day=${current.day}&flight=${flight.flight_no}`;
-      window.location.href = url;
-    };
+        const btn = document.createElement('div');
+        btn.className = 'btn';
+        btn.innerText = flight.flight_no;
+        btn.onclick = () => {
+          const url = `final-load.html?year=${current.year}&month=${current.month.value}&monthText=${current.month.label}&day=${current.day}&flight=${flight.flight_no}`;
+          window.location.href = url;
+        };
 
-    const edit = document.createElement('button');
-    edit.innerText = '✏️';
-    edit.onclick = () => {
-      currentEditFlightId = flight.id;
-      document.getElementById("edit-flight-no").value = flight.flight_no;
-      document.getElementById("edit-destination").value = flight.destination;
-      document.getElementById("edit-std").value = flight.std?.slice(0,5) || "00:00";
-      document.getElementById("flight-edit-modal").style.display = "block";
-    };
+        const edit = document.createElement('button');
+        edit.innerText = '✏️';
+        edit.onclick = () => {
+          currentEditFlightId = flight.id;
+          document.getElementById("edit-flight-no").value = flight.flight_no;
+          document.getElementById("edit-destination").value = flight.destination;
+          document.getElementById("edit-std").value = convertTo24HrFormat(flight.std?.slice(0, 5));
+          document.getElementById("flight-edit-modal").style.display = "block";
+        };
 
-    const del = document.createElement('button');
-    del.innerText = '🗑️';
-    del.onclick = async () => {
-      if (confirm(`Delete flight ${flight.flight_no}?`)) {
-        await sb.from("flights").delete().eq("id", flight.id);
-        loadFlightsFromSupabase();
-      }
-    };
+        const del = document.createElement('button');
+        del.innerText = '🗑️';
+        del.onclick = async () => {
+          if (confirm(`Delete flight ${flight.flight_no}?`)) {
+            await sb.from("flights").delete().eq("id", flight.id);
+            loadFlightsFromSupabase();
+          }
+        };
 
-    wrapper.appendChild(btn);
-    wrapper.appendChild(edit);
-    wrapper.appendChild(del);
-    container.appendChild(wrapper);
-  });
-}
+        wrapper.appendChild(btn);
+        wrapper.appendChild(edit);
+        wrapper.appendChild(del);
+        container.appendChild(wrapper);
+      });
+    }
 
     async function saveFlightEdit() {
       const newNo = document.getElementById("edit-flight-no").value.trim().toUpperCase();
