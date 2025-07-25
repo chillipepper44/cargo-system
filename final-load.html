@@ -257,6 +257,66 @@ function applyEdit(uldNo, index) {
     window.location.href = 'cargo-summary.html';
   }
 </script>
+
+<button onclick="saveToSupabase()">💾 Save to Supabase</button>
+
+<script>
+  async function saveToSupabase() {
+    // 1. บันทึกเที่ยวบิน
+    const { flight, day, monthText, year, std } = flightInfo;
+    const origin = "DMK";
+    const destination = "CGK";
+    const flightDate = `${year}-${monthTextToNumber(monthText)}-${day.padStart(2, '0')}`;
+    const stdTime = std || "00:00:00";
+
+    const flightRes = await supabase.from("flights").insert({
+      flight_no: flight,
+      flight_date: flightDate,
+      origin,
+      destination,
+      std: stdTime
+    }).select();
+
+    const flightId = flightRes.data?.[0]?.id;
+    if (!flightId) return alert("❌ Failed to save flight.");
+
+    // 2. บันทึก ULD และ AWB
+    for (const uldNo in uldMap) {
+      const uldRes = await supabase.from("ulds").insert({
+        flight_id: flightId,
+        uld_no: uldNo,
+        reg: "", // ใส่ภายหลังถ้ามี
+        shc: ""
+      }).select();
+
+      const uldId = uldRes.data?.[0]?.id;
+      if (!uldId) continue;
+
+      for (const awb of uldMap[uldNo]) {
+        await supabase.from("awbs").insert({
+          uld_id: uldId,
+          awb_no: awb.awbNo,
+          pcs: parseInt(awb.qty),
+          weight: parseFloat(awb.weight),
+          destination: destination,
+          part: "",
+          shc: ""
+        });
+      }
+    }
+
+    alert("✅ Saved all data to Supabase!");
+  }
+
+  function monthTextToNumber(text) {
+    const map = {
+      JAN: "01", FEB: "02", MAR: "03", APR: "04", MAY: "05", JUN: "06",
+      JUL: "07", AUG: "08", SEP: "09", OCT: "10", NOV: "11", DEC: "12"
+    };
+    return map[text.toUpperCase()] || "01";
+  }
+</script>
+
 <!-- Supabase Client -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
