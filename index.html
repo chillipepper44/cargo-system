@@ -218,54 +218,54 @@
       }
     }
 
-    async function loadFlightsFromSupabase() {
-      const container = document.getElementById('flight-list');
-      container.innerHTML = '';
+async function loadFlightsFromSupabase() {
+  const container = document.getElementById('flight-list');
+  container.innerHTML = '';
 
-      const { data } = await sb
-        .from("flights")
-        .select("id, flight_no, destination, std")
-        .eq("flight_date", `${current.year}-${current.month.value}-${current.day}`);
+  const { data } = await sb
+    .from("flights")
+    .select("id, flight_no, destination, std")
+    .eq("flight_date", `${current.year}-${current.month.value}-${current.day}`);
 
-      (data || []).forEach(flight => {
-        const wrapper = document.createElement('div');
-        wrapper.style.display = 'inline-flex';
-        wrapper.style.alignItems = 'center';
-        wrapper.style.margin = '6px';
+  (data || []).forEach(flight => {
+    const wrapper = document.createElement('div');
+    wrapper.style.display = 'inline-flex';
+    wrapper.style.alignItems = 'center';
+    wrapper.style.margin = '6px';
 
-        const btn = document.createElement('div');
-        btn.className = 'btn';
-        btn.innerText = flight.flight_no;
-        btn.onclick = () => {
-          const url = `final-load.html?year=${current.year}&month=${current.month.value}&monthText=${current.month.label}&day=${current.day}&flight=${flight.flight_no}`;
-          window.location.href = url;
-        };
+    const btn = document.createElement('div');
+    btn.className = 'btn';
+    btn.innerText = flight.flight_no;
+    btn.onclick = () => {
+      const url = `final-load.html?year=${current.year}&month=${current.month.value}&monthText=${current.month.label}&day=${current.day}&flight=${flight.flight_no}`;
+      window.location.href = url;
+    };
 
-        const del = document.createElement('button');
-        del.innerText = '🗑️';
-        del.onclick = async () => {
-          if (confirm(`Delete flight ${flight.flight_no}?`)) {
-            await sb.from("flights").delete().eq("id", flight.id);
-            loadFlightsFromSupabase();
-          }
-        };
+    const edit = document.createElement('button');
+    edit.innerText = '✏️';
+    edit.onclick = () => {
+      currentEditFlightId = flight.id;
+      document.getElementById("edit-flight-no").value = flight.flight_no;
+      document.getElementById("edit-destination").value = flight.destination;
+      document.getElementById("edit-std").value = flight.std?.slice(0,5) || "00:00";
+      document.getElementById("flight-edit-modal").style.display = "block";
+    };
 
-        const edit = document.createElement('button');
-        edit.innerText = '✏️';
-        edit.onclick = () => {
-          currentEditFlightId = flight.id;
-          document.getElementById("edit-flight-no").value = flight.flight_no;
-          document.getElementById("edit-destination").value = flight.destination;
-          document.getElementById("edit-std").value = flight.std?.slice(0, 5) || "00:00";
-          document.getElementById("flight-edit-modal").style.display = "block";
-        };
+    const del = document.createElement('button');
+    del.innerText = '🗑️';
+    del.onclick = async () => {
+      if (confirm(`Delete flight ${flight.flight_no}?`)) {
+        await sb.from("flights").delete().eq("id", flight.id);
+        loadFlightsFromSupabase();
+      }
+    };
 
-        wrapper.appendChild(btn);
-        wrapper.appendChild(edit);
-        wrapper.appendChild(del);
-        container.appendChild(wrapper);
-      });
-    }
+    wrapper.appendChild(btn);
+    wrapper.appendChild(edit);
+    wrapper.appendChild(del);
+    container.appendChild(wrapper);
+  });
+}
 
     async function saveFlightEdit() {
       const newNo = document.getElementById("edit-flight-no").value.trim().toUpperCase();
