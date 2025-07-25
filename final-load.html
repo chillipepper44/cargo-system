@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Final Load Entry</title>
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      background: #f2f6fb;
+      padding: 30px;
+    }
+    h1, h2 {
+      color: #2d58a4;
+    }
+    .info-box {
+      margin-bottom: 20px;
+      padding: 12px;
+      background: #e9eff8;
+      border-left: 4px solid #2d58a4;
+    }
+    input {
+      padding: 6px;
+      margin: 6px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    button {
+      padding: 6px 12px;
+      margin: 4px;
+      background: #2d58a4;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #1e3d7b;
+    }
+    .btn-red {
+      background: #e74c3c;
+    }
+    .btn-gray {
+      background: #888;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      background: white;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 6px;
+      text-align: center;
+    }
+    .uld-block {
+      margin-top: 30px;
+      background: #fff;
+      padding: 12px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+  </style>
+</head>
+<button onclick="history.back()" style="margin-bottom: 10px;">
+  🔙 Back
+</button>
+
+<body>
+
+  <h1>Final Load Entry</h1>
+  <div class="info-box" id="flight-info">Loading flight info...</div>
+
+  <h2>Add AWB to ULD</h2>
+  <input type="text" id="uldNo" placeholder="ULD No" />
+  <input type="text" id="awbNo" placeholder="AWB No" />
+  <input type="number" id="qty" placeholder="PCS" />
+  <input type="number" id="weight" placeholder="Weight (kg)" />
+  <button onclick="addAWB()">+ Add AWB</button>
+
+  <div id="uldArea"></div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const flightInfo = {
+      year: params.get('year'),
+      month: params.get('month'),
+      monthText: params.get('monthText'),
+      day: params.get('day'),
+      flight: params.get('flight')
+    };
+
+    document.getElementById('flight-info').innerText =
+      `Flight ${flightInfo.flight} on ${flightInfo.day}-${flightInfo.monthText}-${flightInfo.year}`;
+
+    const uldMap = {}; // { uldNo: [{awbNo, qty, weight}] }
+
+    function addAWB() {
+      const uldNo = document.getElementById('uldNo').value.trim().toUpperCase();
+      const awbNo = document.getElementById('awbNo').value.trim();
+      const qty = document.getElementById('qty').value.trim();
+      const weight = document.getElementById('weight').value.trim();
+
+      if (!uldNo || !awbNo || !qty || !weight) {
+        alert("Please fill all fields.");
+        return;
+      }
+
+      if (!uldMap[uldNo]) uldMap[uldNo] = [];
+
+      uldMap[uldNo].push({ awbNo, qty, weight });
+      renderULDs();
+
+      document.getElementById('awbNo').value = '';
+      document.getElementById('qty').value = '';
+      document.getElementById('weight').value = '';
+    }
+
+    function deleteULD(uldNo) {
+      if (confirm(`Delete entire ULD ${uldNo}?`)) {
+        delete uldMap[uldNo];
+        renderULDs();
+      }
+    }
+
+    function deleteAWB(uldNo, index) {
+      if (confirm("Delete this AWB?")) {
+        uldMap[uldNo].splice(index, 1);
+        if (uldMap[uldNo].length === 0) delete uldMap[uldNo];
+        renderULDs();
+      }
+    }
+
+    function editULDName(oldUldNo) {
+      const newName = prompt("Enter new ULD No", oldUldNo);
+      if (newName && newName !== oldUldNo) {
+        uldMap[newName] = uldMap[oldUldNo];
+        delete uldMap[oldUldNo];
+        renderULDs();
+        document.getElementById('uldNo').value = newName;
+      }
+    }
+
+function editAWB(uldNo, index) {
+  const entry = uldMap[uldNo][index];
+
+  const modal = document.createElement('div');
+  modal.id = 'awb-edit-modal'; // ✅ เพิ่ม id ให้ modal
+  modal.style.position = 'fixed';
+  modal.style.top = '30%';
+  modal.style.left = '50%';
+  modal.style.transform = 'translate(-50%, -30%)';
+  modal.style.background = '#fff';
+  modal.style.border = '1px solid #ccc';
+  modal.style.padding = '16px';
+  modal.style.zIndex = 1000;
+  modal.innerHTML = `
+    <div style="font-family:Segoe UI;">
+      <label>AWB No: <input id="edit-awb" value="${entry.awbNo}" /></label><br/>
+      <label>PCS: <input id="edit-qty" type="number" value="${entry.qty}" /></label><br/>
+      <label>Weight (kg): <input id="edit-weight" type="number" value="${entry.weight}" /></label><br/><br/>
+      <button onclick="applyEdit('${uldNo}', ${index})">Save</button>
+      <button onclick="document.body.removeChild(this.parentNode.parentNode)">Cancel</button>
+    </div>
+  `;
+  document.body.appendChild(modal);
+}
+
+function applyEdit(uldNo, index) {
+  const awb = document.getElementById('edit-awb').value.trim();
+  const qty = document.getElementById('edit-qty').value.trim();
+  const weight = document.getElementById('edit-weight').value.trim();
+
+  if (awb) uldMap[uldNo][index].awbNo = awb;
+  if (qty) uldMap[uldNo][index].qty = qty;
+  if (weight) uldMap[uldNo][index].weight = weight;
+
+  // ✅ ปิด modal แบบตรงไปตรงมา
+  const modal = document.getElementById('awb-edit-modal');
+  if (modal) document.body.removeChild(modal);
+
+  renderULDs();
+}
+
+    function renderULDs() {
+      const area = document.getElementById('uldArea');
+      area.innerHTML = '';
+
+      Object.keys(uldMap).forEach(uld => {
+        const block = document.createElement('div');
+        block.className = 'uld-block';
+
+        const header = document.createElement('h3');
+        header.innerHTML = `ULD: ${uld}
+          <button class="btn-gray" onclick="editULDName('${uld}')">✏️ Edit</button>
+          <button class="btn-red" onclick="deleteULD('${uld}')">🗑️ Delete ULD</button>`;
+        block.appendChild(header);
+
+        const table = document.createElement('table');
+        table.innerHTML = `
+          <thead><tr><th>AWB No</th><th>PCS</th><th>Weight</th><th>Action</th></tr></thead>
+          <tbody></tbody>
+        `;
+        const tbody = table.querySelector('tbody');
+        uldMap[uld].forEach((entry, i) => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${entry.awbNo}</td>
+            <td>${entry.qty}</td>
+            <td>${entry.weight}</td>
+            <td>
+              <button onclick="editAWB('${uld}', ${i})">✏️</button>
+              <button class="btn-red" onclick="deleteAWB('${uld}', ${i})">🗑️</button>
+            </td>
+          `;
+          tbody.appendChild(row);
+        });
+
+        block.appendChild(table);
+        area.appendChild(block);
+      });
+    }
+  </script>
+<button onclick="goToSummary()">📊 View Summary Report</button>
+
+<script>
+  function goToSummary() {
+    const flightInfo = {
+      flightNo: 'QZ 253',
+      from: 'DMK',
+      to: 'CGK',
+      date: '25/07/2025',
+      std: '00:20:40',
+    };
+
+    const uldList = [
+      {
+        uldNo: "BC-148",
+        mawb: "900-1131 3831",
+        quantity: 36,
+        grossWeight: 274.00,
+        destination: "CGK",
+        shc: "0.00"
+      },
+      {
+        uldNo: "BC-168",
+        mawb: "900-1131 3831",
+        quantity: 40,
+        grossWeight: 304.00,
+        destination: "CGK",
+        shc: "0.00"
+      }
+    ];
+
+    localStorage.setItem('flightInfo', JSON.stringify(flightInfo));
+    localStorage.setItem('uldData', JSON.stringify(uldList));
+    window.location.href = 'cargo-summary.html';
+  }
+</script>
+
+</body>
+</html>

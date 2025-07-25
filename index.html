@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Cargo System - Home</title>
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      background: #f2f6fb;
+      color: #333;
+      padding: 30px;
+    }
+    h1 {
+      color: #2d58a4;
+    }
+    .section {
+      margin-bottom: 40px;
+    }
+    .btn {
+      display: inline-block;
+      padding: 10px 16px;
+      margin: 6px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      cursor: pointer;
+      background: #fff;
+      box-shadow: 1px 1px 3px rgba(0,0,0,0.05);
+      transition: background 0.2s ease;
+    }
+    .btn:hover {
+      background: #d9eaff;
+    }
+    input[type="text"],
+    input[type="number"] {
+      padding: 8px;
+      margin: 5px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      width: 180px;
+    }
+    button {
+      padding: 8px 12px;
+      margin: 5px;
+      background: #2d58a4;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #1e3d7b;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>📦 Cargo System</h1>
+
+  <div id="app">
+    <!-- Step 1: Year -->
+    <div class="section" id="step-year">
+      <h2>Select Year</h2>
+      <div id="year-list"></div>
+      <input type="number" id="new-year" placeholder="Add new year" />
+      <button onclick="addYear()">+ Add Year</button>
+    </div>
+
+    <!-- Step 2: Month -->
+    <div class="section" id="step-month" style="display:none">
+      <h2>Select Month</h2>
+      <div id="month-list"></div>
+    </div>
+
+    <!-- Step 3: Day -->
+    <div class="section" id="step-day" style="display:none">
+      <h2>Select Day</h2>
+      <div id="day-list"></div>
+    </div>
+
+    <!-- Step 4: Flight -->
+    <div class="section" id="step-flight" style="display:none">
+      <h2>Select Flight Number</h2>
+      <div id="flight-list"></div>
+      <input type="text" id="new-flight" placeholder="Add new flight no." />
+      <button onclick="addFlight()">+ Add Flight</button>
+    </div>
+  </div>
+
+  <script>
+    const current = {};
+    let years = [2025];
+    const months = [
+      { label: "JAN", value: "01" }, { label: "FEB", value: "02" }, { label: "MAR", value: "03" },
+      { label: "APR", value: "04" }, { label: "MAY", value: "05" }, { label: "JUN", value: "06" },
+      { label: "JUL", value: "07" }, { label: "AUG", value: "08" }, { label: "SEP", value: "09" },
+      { label: "OCT", value: "10" }, { label: "NOV", value: "11" }, { label: "DEC", value: "12" }
+    ];
+    let flights = ["SL116", "QZ253", "TG123"];
+
+    function renderYear() {
+      const container = document.getElementById('year-list');
+      container.innerHTML = '';
+      years.forEach(y => {
+        const btn = document.createElement('div');
+        btn.className = 'btn';
+        btn.innerText = y;
+        btn.onclick = () => {
+          current.year = y;
+          document.getElementById('step-month').style.display = 'block';
+          renderMonth();
+        };
+        container.appendChild(btn);
+      });
+    }
+
+    function addYear() {
+      const y = document.getElementById('new-year').value.trim();
+      if (y && !years.includes(parseInt(y))) {
+        years.push(parseInt(y));
+        renderYear();
+        document.getElementById('new-year').value = '';
+      }
+    }
+
+    function renderMonth() {
+      const container = document.getElementById('month-list');
+      container.innerHTML = '';
+      months.forEach(m => {
+        const btn = document.createElement('div');
+        btn.className = 'btn';
+        btn.innerText = m.label;
+        btn.onclick = () => {
+          current.month = m;
+          document.getElementById('step-day').style.display = 'block';
+          renderDay();
+        };
+        container.appendChild(btn);
+      });
+    }
+
+    function renderDay() {
+      const container = document.getElementById('day-list');
+      container.innerHTML = '';
+      for (let d = 1; d <= 31; d++) {
+        const day = d.toString().padStart(2, '0');
+        const btn = document.createElement('div');
+        btn.className = 'btn';
+        btn.innerText = day;
+        btn.onclick = () => {
+          current.day = day;
+          document.getElementById('step-flight').style.display = 'block';
+          renderFlightList();
+        };
+        container.appendChild(btn);
+      }
+    }
+
+    function renderFlightList() {
+      const container = document.getElementById('flight-list');
+      container.innerHTML = '';
+      flights.forEach((flight, index) => {
+        const wrapper = document.createElement('div');
+        wrapper.style.display = 'inline-flex';
+        wrapper.style.alignItems = 'center';
+        wrapper.style.margin = '6px';
+
+    const btn = document.createElement('div');
+    btn.className = 'btn';
+    btn.innerText = flight;
+    btn.onclick = () => {
+      const url = `final-load.html?year=${current.year}&month=${current.month.value}&monthText=${current.month.label}&day=${current.day}&flight=${flight}`;
+      window.location.href = url;
+    };
+
+    const delBtn = document.createElement('button');
+    delBtn.style.marginLeft = '8px';
+    delBtn.style.background = '#e74c3c';
+    delBtn.style.fontSize = '13px';
+    delBtn.innerText = '🗑️';
+    delBtn.onclick = () => {
+      if (confirm(`Delete flight ${flight}?`)) {
+        flights.splice(index, 1);
+        renderFlightList();
+      }
+    };
+
+    wrapper.appendChild(btn);
+    wrapper.appendChild(delBtn);
+    container.appendChild(wrapper);
+  });
+}
+
+
+    function addFlight() {
+      const flight = document.getElementById('new-flight').value.trim().toUpperCase();
+      if (flight && !flights.includes(flight)) {
+        flights.push(flight);
+        renderFlightList();
+        document.getElementById('new-flight').value = '';
+      }
+    }
+
+    renderYear();
+  </script>
+
+</body>
+</html>
