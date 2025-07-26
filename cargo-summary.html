@@ -1,55 +1,43 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Cargo Summary Report</title>
   <style>
     body {
       font-family: "Courier New", monospace;
-      background: white;
+      background: #fff;
       padding: 40px;
-    }
-
-    #report {
+      font-size: 12pt;
       white-space: pre;
-      font-size: 12px;
-      line-height: 1.6;
     }
 
-    .red-bold {
-      color: #a30000;
-      font-weight: bold;
-      text-decoration: underline;
-    }
-
-    .black-bold {
-      font-weight: bold;
-    }
-
+    .bold { font-weight: bold; }
+    .red { color: #d60000; }
+    .underline { text-decoration: underline; }
     .double-underline {
-      text-decoration: underline;
-      text-decoration-style: double;
-    }
-
-    .section-line {
-      margin-top: 10px;
-      margin-bottom: 5px;
+      border-bottom: 3px double black;
+      display: inline-block;
+      padding-bottom: 2px;
+      line-height: 1.2;
     }
 
     button {
-      margin: 8px 5px;
+      margin: 10px 5px;
       padding: 6px 12px;
-      background: #2d58a4;
-      color: white;
       border: none;
       border-radius: 4px;
+      background: #1976d2;
+      color: white;
       cursor: pointer;
     }
 
     @media print {
-      button {
-        display: none;
-      }
+      button { display: none; }
+    }
+
+    #report {
+      white-space: pre-wrap;
     }
   </style>
 
@@ -61,15 +49,15 @@
   <button onclick="window.print()">🖨️ Print</button>
   <button onclick="savePDF()">💾 Save as PDF</button>
 
-  <pre id="report">Loading...</pre>
+  <div id="report">Loading...</div>
 
   <script>
     const sb = supabase.createClient(
       'https://xgaforpzjrievucwlgla.supabase.co',
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhnYWZvcnB6anJpZXZ1Y3dsZ2xhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM0NTEyMDQsImV4cCI6MjA2OTAyNzIwNH0.QPUOtbCPdxrqiWr93yp7FsxznzSyA_Je1oF4D65rzXs'
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
     );
 
-    function format(text, width) {
+    function pad(text, width) {
       return text.toString().padEnd(width, ' ');
     }
 
@@ -87,67 +75,82 @@
         .eq("flight_date", flight_date)
         .limit(1);
 
-      if (!flightData || flightData.length === 0) {
-        document.getElementById('report').innerText = "❌ Flight not found.";
+      if (!flightData?.length) {
+        document.getElementById("report").innerText = "❌ Flight not found.";
         return;
       }
 
       const flight = flightData[0];
-      const std = flight.std || '00:00:00';
-      const from = flight.origin || 'DMK';
-      const to = flight.destination || 'XXX';
+      const std = flight.std || "00:00:00";
+      const from = flight.origin || "DMK";
+      const to = flight.destination || "XXX";
 
       const { data: ulds } = await sb
         .from("ulds")
         .select("id, uld_no, awbs(*)")
         .eq("flight_id", flight.id);
 
-      let html = '';
-      html += `<span class="black-bold">${flight.flight_no.padEnd(16)}${from.padEnd(8)}${to}</span>\n\n`;
-      html += `<span class="black-bold">${flight_date} ${std.padEnd(10)}     ${flight_date} ${std}</span>\n\n`;
+      let output = '';
 
-      html += `<span class="red-bold">MawbNo</span>           <span class="red-bold">Quantity  GrossWeigh  DestPortShipmen  Get Weight   SHC</span>\n\n`;
+      output += `<span class="bold">${pad(flight.flight_no, 16)}</span>\t${pad(from, 8)}${to}\n\n`;
+      output += `<span class="bold">${pad(flight_date + " " + std, 24)}</span>${flight_date} ${std}\n\n`;
+
+      output += `<span class="bold underline">${pad("MawbNo", 18)}${pad("Quantity", 10)}${pad("GrossWeigh", 12)}${pad("DestPortShipmen", 18)}${pad("Get Weight", 12)}SHC</span>\n\n`;
 
       let totalULD = 0;
       let totalPCS = 0;
       let totalWeight = 0;
 
       for (const uld of ulds) {
-        html += `<span class="red-bold">ULD NO </span><span class="red-bold">${uld.uld_no}</span>\n`;
+        output += `<span class="bold red underline">ULD NO</span> <span class="bold red">${uld.uld_no}</span>\n`;
 
         for (const awb of uld.awbs) {
-          html += '  ' +
-            format(awb.awb_no, 18) +
-            format(awb.pcs || 0, 10) +
-            format((awb.weight || 0).toFixed(2), 12) +
-            format(awb.destination || '', 18) +
-            format('0.00', 12) +
+          output += '  ' +
+            pad(awb.awb_no, 18) +
+            pad(awb.pcs || 0, 10) +
+            pad((awb.weight || 0).toFixed(2), 12) +
+            pad(awb.destination || '', 18) +
+            pad('0.00', 12) +
             (awb.shc || '') + '\n';
 
           totalPCS += awb.pcs || 0;
           totalWeight += awb.weight || 0;
         }
 
-        html += '\n';
+        output += '\n';
         totalULD++;
       }
 
-      html += `<span class="red-bold">TOTAL ULD :</span> <span class="black-bold">${String(totalULD).padEnd(10)}</span>`;
-      html += `<span class="black-bold double-underline">${String(totalPCS.toFixed(2)).padEnd(12)}</span>`;
-      html += `<span class="black-bold double-underline">${String(totalWeight.toFixed(2)).padEnd(18)}</span>`;
-      html += `<span class="black-bold double-underline">0.00</span>\n`;
+      output += `<span class="bold red underline">TOTAL ULD :</span> ${pad(totalULD, 10)}`;
+      output += `<span class="bold double-underline">${pad(totalPCS, 12)}</span>`;
+      output += `<span class="bold double-underline">${pad(totalWeight.toFixed(2), 14)}</span>`;
+      output += `${pad("", 18)}<span class="bold double-underline">0.00</span>`;
 
-      document.getElementById('report').innerHTML = html;
+      document.getElementById("report").innerHTML = output;
     }
 
     function savePDF() {
       const { jsPDF } = window.jspdf;
-      const doc = new jsPDF({ unit: 'pt', format: 'a4' });
-
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
       const text = document.getElementById("report").innerText;
+      const margin = 10;
+      const pageHeight = doc.internal.pageSize.height;
+      const lineHeight = 5;
+      const lines = doc.splitTextToSize(text, 190);
+      let y = margin;
+
       doc.setFont("Courier", "normal");
       doc.setFontSize(10);
-      doc.text(text, 40, 40);
+
+      for (let i = 0; i < lines.length; i++) {
+        if (y + lineHeight > pageHeight - margin) {
+          doc.addPage();
+          y = margin;
+        }
+        doc.text(lines[i], margin, y);
+        y += lineHeight;
+      }
+
       doc.save("Cargo_Summary.pdf");
     }
 
