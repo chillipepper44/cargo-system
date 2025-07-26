@@ -279,19 +279,42 @@ async function loadFlightsFromSupabase() {
       document.getElementById("flight-edit-modal").style.display = "block";
     };
 
-    const del = document.createElement('button');
-    del.innerText = '🗑️';
-    del.onclick = async () => {
-      if (confirm(`Delete flight ${flight.flight_no}?`)) {
-        const { error: deleteError } = await sb.from("flights").delete().eq("id", flight.id);
-        if (deleteError) {
-          alert("❌ Failed to delete flight.");
-          console.error("Delete error:", deleteError);
-        } else {
-          loadFlightsFromSupabase();
-        }
-      }
-    };
+const del = document.createElement('button');
+del.innerText = '🗑️';
+del.onclick = async () => {
+  if (!confirm(`Delete flight ${flight.flight_no} and all related ULDs/AWBs?`)) return;
+
+  try {
+    // 1. ค้นหา ULDs ที่เชื่อมโยงกับ flight นี้
+    const { data: ulds, error: uldError } = await sb
+      .from("ulds")
+      .select("id")
+      .eq("flight_id", flight.id);
+
+    if (uldError) throw uldError;
+
+    for (const uld of ulds || []) {
+      // 2. ลบ AWBs ที่เชื่อมกับแต่ละ ULD
+      const { error: awbDelError } = await sb.from("awbs").delete().eq("uld_id", uld.id);
+      if (awbDelError) throw awbDelError;
+
+      // 3. ลบ ULD เอง
+      const { error: uldDelError } = await sb.from("ulds").delete().eq("id", uld.id);
+      if (uldDelError) throw uldDelError;
+    }
+
+    // 4. ลบ flight เมื่อไม่มีอะไรอ้างอิงแล้ว
+    const { error: deleteError } = await sb.from("flights").delete().eq("id", flight.id);
+    if (deleteError) throw deleteError;
+
+    alert("✅ Flight and related data deleted successfully.");
+    loadFlightsFromSupabase();
+
+  } catch (err) {
+    console.error("❌ Delete cascade failed:", err);
+    alert("❌ Failed to delete flight and related records.");
+  }
+};
 
     wrapper.appendChild(btn);
     wrapper.appendChild(edit);
