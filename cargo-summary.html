@@ -48,84 +48,85 @@
   <button onclick="generatePDF()">💾 Save PDF</button>
   <div id="content"></div>
 
-  <script>
-    const sb = supabase.createClient(
-      'https://xgaforpzjrievucwlgla.supabase.co',
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhnYWZvcnB6anJpZXZ1Y3dsZ2xhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM0NTEyMDQsImV4cCI6MjA2OTAyNzIwNH0.QPUOtbCPdxrqiWr93yp7FsxznzSyA_Je1oF4D65rzXs'
-    );
+<script>
+const sb = supabase.createClient(
+  'https://xgaforpzjrievucwlgla.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
+);
 
-    async function loadReport() {
-      const flightInfo = JSON.parse(localStorage.getItem("flightInfo"));
-      if (!flightInfo) return;
+async function loadReport() {
+  const flightInfo = JSON.parse(localStorage.getItem("flightInfo"));
+  if (!flightInfo) return;
 
-      const flight_date = `${flightInfo.year}-${flightInfo.month}-${flightInfo.day}`;
-      const flight_no = flightInfo.flight;
+  const flight_date = `${flightInfo.year}-${flightInfo.month}-${flightInfo.day}`;
+  const flight_no = flightInfo.flight;
 
-      const { data: flightData, error: flightError } = await sb
-        .from("flights")
-        .select("*")
-        .eq("flight_no", flight_no)
-        .eq("flight_date", flight_date)
-        .limit(1);
+  const { data: flightData } = await sb
+    .from("flights")
+    .select("*")
+    .eq("flight_no", flight_no)
+    .eq("flight_date", flight_date)
+    .limit(1);
 
-      if (!flightData || flightData.length === 0) {
-        document.getElementById("content").innerText = "❌ Flight not found.";
-        return;
-      }
+  if (!flightData || flightData.length === 0) {
+    document.getElementById("content").innerText = "❌ Flight not found.";
+    return;
+  }
 
-      const flight = flightData[0];
-      const std = flight.std || "00:00:00";
-      const from = flight.origin || "DMK";
-      const to = flight.destination || "XXX";
+  const flight = flightData[0];
+  const std = flight.std || "00:00:00";
+  const from = flight.origin || "DMK";
+  const to = flight.destination || "XXX";
 
-      const { data: ulds } = await sb
-        .from("ulds")
-        .select("id, uld_no, awbs(*)")
-        .eq("flight_id", flight.id);
+  const { data: ulds } = await sb
+    .from("ulds")
+    .select("id, uld_no, awbs(*)")
+    .eq("flight_id", flight.id);
 
-      let html = '';
-      html += `<div class="line bold">${flight_no}&emsp;&emsp;&emsp;&emsp;&emsp;${from}&emsp;${to}</div>`;
-      html += `<div class="line">${flight_date} ${std}&emsp;&emsp;&emsp;&emsp;&emsp;${flight_date} ${std}</div><br>`;
+  let totalULD = 0;
+  let totalPCS = 0;
+  let totalWeight = 0;
+  const getWeight = "0.00";
 
-      html += `<div class="line underline bold">MawbNo&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Quantity&nbsp;&nbsp;&nbsp;&nbsp;GrossWeigh&nbsp;&nbsp;&nbsp;DestPortShipmen&nbsp;&nbsp;&nbsp;&nbsp;Get Weight&nbsp;&nbsp;&nbsp;&nbsp;SHC</div><br>`;
+  let output = "";
 
-      let totalULD = 0;
-      let totalPCS = 0;
-      let totalWeight = 0;
+  // Header
+  output += `${flight_no.padEnd(10)}${from.padEnd(10)}${to}\n\n`;
+  output += `${flight_date} ${std}     ${flight_date} ${std}\n\n`;
+  output += `MawbNo            Quantity  GrossWeigh  DestPortShipmen     Get Weight   SHC\n\n`;
 
-      for (const uld of ulds) {
-        html += `<div class="line bold red underline">ULD NO ${uld.uld_no}</div>`;
+  for (const uld of ulds) {
+    output += `ULD NO  ${uld.uld_no}\n\n`;
 
-        for (const awb of uld.awbs) {
-          html += `<div class="line"><span class="bold red">&nbsp;&nbsp;${awb.awb_no.padEnd(18)}</span>${String(awb.pcs).padEnd(10)}${awb.weight.toFixed(2).padEnd(13)}${(awb.destination || '').padEnd(20)}${"0.00".padEnd(13)}${awb.shc || ''}</div>`;
-          totalPCS += awb.pcs;
-          totalWeight += awb.weight;
-        }
-
-        html += `<br>`;
-        totalULD++;
-      }
-
-      html += `<div class="line bold red underline">TOTAL ULD :</div>`;
-      html += `<div class="line"><span class="bold">${String(totalULD).padEnd(10)}</span>
-               <span class="bold double-underline">${String(totalPCS).padEnd(10)}</span>
-               <span class="bold double-underline">${totalWeight.toFixed(2).padEnd(12)}</span></div>`;
-
-      document.getElementById("content").innerHTML = html;
+    for (const awb of uld.awbs) {
+      const line = `  ${awb.awb_no.padEnd(18)}${String(awb.pcs).padEnd(10)}${awb.weight.toFixed(2).padEnd(11)}${(awb.destination || "").padEnd(20)}${getWeight.padEnd(13)}${awb.shc || ""}`;
+      output += line + "\n";
+      totalPCS += awb.pcs;
+      totalWeight += awb.weight;
     }
 
-    function generatePDF() {
-      const element = document.getElementById("content");
-      html2pdf().set({
-        margin: 10,
-        filename: 'Cargo_Summary.pdf',
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2 },
-        jsPDF: { unit: 'pt', format: 'a4', orientation: 'portrait' }
-      }).from(element).save();
-    }
+    output += `\n`;
+    totalULD++;
+  }
 
-    loadReport();
-  </script>
+  output += `TOTAL ULD :  ${String(totalULD).padEnd(10)}${String(totalPCS.toFixed(2)).padEnd(10)}${totalWeight.toFixed(2).padEnd(20)}${getWeight}\n`;
+
+  document.getElementById("content").innerHTML = `<pre>${output}</pre>`;
+}
+
+function generatePDF() {
+  const element = document.getElementById("content");
+  html2pdf().set({
+    margin: 10,
+    filename: 'Cargo_Summary.pdf',
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2 },
+    jsPDF: { unit: 'pt', format: 'a4', orientation: 'portrait' }
+  }).from(element).save();
+}
+
+loadReport();
+</script>
+
 </body>
 </html>
