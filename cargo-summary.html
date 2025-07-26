@@ -9,12 +9,11 @@
       background: #f4f6f8;
       padding: 30px;
     }
-    #report {
-      white-space: pre;
-      background: white;
-      padding: 20px;
-      border: 1px solid #ccc;
-    }
+#report {
+  white-space: pre;
+  font-family: monospace;
+  font-size: 12px;
+}
     button {
       margin: 10px 5px;
       padding: 6px 12px;
@@ -24,14 +23,14 @@
       color: white;
       cursor: pointer;
     }
-    @media print {
-      button {
-        display: none;
-      }
-      body {
-        background: white;
-      }
-    }
+@media print {
+  button {
+    display: none;
+  }
+  body {
+    background: white;
+  }
+}
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -114,15 +113,32 @@
       document.getElementById('report').innerText = output;
     }
 
-    function savePDF() {
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF();
-      const text = document.getElementById("report").textContent;
-      doc.setFont("Courier", "normal");
-      doc.setFontSize(10);
-      doc.text(text, 10, 10);
-      doc.save("Cargo_Summary.pdf");
+function savePDF() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const text = document.getElementById("report").textContent;
+
+  const margin = 10;
+  const pageHeight = doc.internal.pageSize.height;
+  const lineHeight = 4.5;
+  const lines = doc.splitTextToSize(text, 190);
+  let y = margin;
+
+  doc.setFont("Courier", "normal");
+  doc.setFontSize(10);
+
+  for (let i = 0; i < lines.length; i++) {
+    if (y + lineHeight > pageHeight - margin) {
+      doc.addPage();
+      y = margin;
     }
+    doc.text(lines[i], margin, y);
+    y += lineHeight;
+  }
+
+  doc.save("Cargo_Summary.pdf");
+}
+
 
     loadReport();
   </script>
