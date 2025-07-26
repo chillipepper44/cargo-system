@@ -5,48 +5,56 @@
   <title>Cargo Summary Report</title>
   <style>
     body {
-      font-family: monospace;
-      background: #f4f6f8;
-      padding: 30px;
+      font-family: "Courier New", monospace;
+      background: white;
+      padding: 40px;
     }
+
     #report {
       white-space: pre;
-      background: white;
-      padding: 20px;
-      font-size: 14px;
+      font-size: 12px;
+      line-height: 1.6;
     }
+
+    .red-bold {
+      color: #a30000;
+      font-weight: bold;
+      text-decoration: underline;
+    }
+
+    .black-bold {
+      font-weight: bold;
+    }
+
+    .double-underline {
+      text-decoration: underline;
+      text-decoration-style: double;
+    }
+
+    .section-line {
+      margin-top: 10px;
+      margin-bottom: 5px;
+    }
+
     button {
-      margin: 10px 5px;
+      margin: 8px 5px;
       padding: 6px 12px;
+      background: #2d58a4;
+      color: white;
       border: none;
       border-radius: 4px;
-      background: #1976d2;
-      color: white;
       cursor: pointer;
     }
+
     @media print {
       button {
         display: none;
       }
-      body {
-        background: white;
-      }
-    }
-    .bold {
-      font-weight: bold;
-    }
-    .red {
-      color: #a30000;
-    }
-    .underline {
-      text-decoration: underline;
-    }
-    .double-underline {
-      text-decoration-line: underline;
-      text-decoration-style: double;
     }
   </style>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
 
@@ -55,10 +63,8 @@
 
   <pre id="report">Loading...</pre>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-
   <script>
-    const supabase = supabase.createClient(
+    const sb = supabase.createClient(
       'https://xgaforpzjrievucwlgla.supabase.co',
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhnYWZvcnB6anJpZXZ1Y3dsZ2xhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM0NTEyMDQsImV4cCI6MjA2OTAyNzIwNH0.QPUOtbCPdxrqiWr93yp7FsxznzSyA_Je1oF4D65rzXs'
     );
@@ -74,7 +80,7 @@
       const flight_date = `${info.year}-${info.month}-${info.day}`;
       const flight_no = info.flight;
 
-      const { data: flightData } = await supabase
+      const { data: flightData } = await sb
         .from("flights")
         .select("*")
         .eq("flight_no", flight_no)
@@ -91,33 +97,28 @@
       const from = flight.origin || 'DMK';
       const to = flight.destination || 'XXX';
 
-      const { data: ulds } = await supabase
+      const { data: ulds } = await sb
         .from("ulds")
         .select("id, uld_no, awbs(*)")
         .eq("flight_id", flight.id);
 
-      let output = '';
-      output += `${flight.flight_no}`.padEnd(20) + `${from}`.padStart(6) + `${to}`.padStart(10) + '\n';
-      output += `${flight_date} ${std}`.padEnd(20) + `${flight_date} ${std}`.padStart(20) + '\n\n';
+      let html = '';
+      html += `<span class="black-bold">${flight.flight_no.padEnd(16)}${from.padEnd(8)}${to}</span>\n\n`;
+      html += `<span class="black-bold">${flight_date} ${std.padEnd(10)}     ${flight_date} ${std}</span>\n\n`;
 
-      output += '\x1b[1m\x1b[4m' +
-        format("MawbNo", 18) +
-        format("Quantity", 10) +
-        format("GrossWeigh", 12) +
-        format("DestPortShipmen", 18) +
-        format("Get Weight", 12) +
-        "SHC" + '\x1b[0m\n\n';
+      html += `<span class="red-bold">MawbNo</span>           <span class="red-bold">Quantity  GrossWeigh  DestPortShipmen  Get Weight   SHC</span>\n\n`;
 
       let totalULD = 0;
       let totalPCS = 0;
       let totalWeight = 0;
 
       for (const uld of ulds) {
-        output += '\x1b[1m\x1b[4m\x1b[31mULD NO\x1b[0m  ' + '\x1b[1m\x1b[31m' + uld.uld_no + '\x1b[0m' + '\n';
+        html += `<span class="red-bold">ULD NO </span><span class="red-bold">${uld.uld_no}</span>\n`;
 
         for (const awb of uld.awbs) {
-          output += format(awb.awb_no, 18) +
-            format((awb.pcs || 0).toFixed(2), 10) +
+          html += '  ' +
+            format(awb.awb_no, 18) +
+            format(awb.pcs || 0, 10) +
             format((awb.weight || 0).toFixed(2), 12) +
             format(awb.destination || '', 18) +
             format('0.00', 12) +
@@ -127,31 +128,31 @@
           totalWeight += awb.weight || 0;
         }
 
-        output += '\n';
+        html += '\n';
         totalULD++;
       }
 
-      output += '\x1b[1m\x1b[4m\x1b[31mTOTAL ULD :\x1b[0m'.padEnd(20) +
-        String(totalULD).padEnd(10) +
-        '\x1b[1m\x1b[4:doublem' + format(totalPCS.toFixed(2), 12) +
-        format(totalWeight.toFixed(2), 12) +
-        format('', 18) +
-        format('0.00', 12) + '\x1b[0m';
+      html += `<span class="red-bold">TOTAL ULD :</span> <span class="black-bold">${String(totalULD).padEnd(10)}</span>`;
+      html += `<span class="black-bold double-underline">${String(totalPCS.toFixed(2)).padEnd(12)}</span>`;
+      html += `<span class="black-bold double-underline">${String(totalWeight.toFixed(2)).padEnd(18)}</span>`;
+      html += `<span class="black-bold double-underline">0.00</span>\n`;
 
-      document.getElementById('report').innerText = output;
+      document.getElementById('report').innerHTML = html;
     }
 
     function savePDF() {
       const { jsPDF } = window.jspdf;
-      const doc = new jsPDF();
-      const text = document.getElementById("report").textContent;
+      const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+
+      const text = document.getElementById("report").innerText;
       doc.setFont("Courier", "normal");
       doc.setFontSize(10);
-      doc.text(text, 10, 10);
+      doc.text(text, 40, 40);
       doc.save("Cargo_Summary.pdf");
     }
 
     loadReport();
   </script>
+
 </body>
 </html>
