@@ -9,11 +9,12 @@
       background: #f4f6f8;
       padding: 30px;
     }
-#report {
-  white-space: pre;
-  font-family: monospace;
-  font-size: 12px;
-}
+    #report {
+      white-space: pre;
+      background: white;
+      padding: 20px;
+      font-size: 14px;
+    }
     button {
       margin: 10px 5px;
       padding: 6px 12px;
@@ -23,14 +24,27 @@
       color: white;
       cursor: pointer;
     }
-@media print {
-  button {
-    display: none;
-  }
-  body {
-    background: white;
-  }
-}
+    @media print {
+      button {
+        display: none;
+      }
+      body {
+        background: white;
+      }
+    }
+    .bold {
+      font-weight: bold;
+    }
+    .red {
+      color: #a30000;
+    }
+    .underline {
+      text-decoration: underline;
+    }
+    .double-underline {
+      text-decoration-line: underline;
+      text-decoration-style: double;
+    }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -44,7 +58,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
   <script>
-    const sb = supabase.createClient(
+    const supabase = supabase.createClient(
       'https://xgaforpzjrievucwlgla.supabase.co',
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhnYWZvcnB6anJpZXZ1Y3dsZ2xhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM0NTEyMDQsImV4cCI6MjA2OTAyNzIwNH0.QPUOtbCPdxrqiWr93yp7FsxznzSyA_Je1oF4D65rzXs'
     );
@@ -60,7 +74,7 @@
       const flight_date = `${info.year}-${info.month}-${info.day}`;
       const flight_no = info.flight;
 
-      const { data: flightData } = await sb
+      const { data: flightData } = await supabase
         .from("flights")
         .select("*")
         .eq("flight_no", flight_no)
@@ -77,71 +91,67 @@
       const from = flight.origin || 'DMK';
       const to = flight.destination || 'XXX';
 
-      const { data: ulds } = await sb
+      const { data: ulds } = await supabase
         .from("ulds")
         .select("id, uld_no, awbs(*)")
         .eq("flight_id", flight.id);
 
       let output = '';
-      output += `\t${flight.flight_no}\t\t\t${from}\t${to}\n\n`;
-      output += `\t${flight_date} ${std}\t\t${flight_date} ${std}\n\n`;
+      output += `${flight.flight_no}`.padEnd(20) + `${from}`.padStart(6) + `${to}`.padStart(10) + '\n';
+      output += `${flight_date} ${std}`.padEnd(20) + `${flight_date} ${std}`.padStart(20) + '\n\n';
 
-      output += `\tMawbNo\t\t\t\tQuantity  GrossWeigh  DestPortShipmen\tGet Weight   SHC\n\n`;
+      output += '\x1b[1m\x1b[4m' +
+        format("MawbNo", 18) +
+        format("Quantity", 10) +
+        format("GrossWeigh", 12) +
+        format("DestPortShipmen", 18) +
+        format("Get Weight", 12) +
+        "SHC" + '\x1b[0m\n\n';
 
       let totalULD = 0;
       let totalPCS = 0;
       let totalWeight = 0;
 
       for (const uld of ulds) {
-        output += `\n\tULD NO\t${uld.uld_no}\n`;
+        output += '\x1b[1m\x1b[4m\x1b[31mULD NO\x1b[0m  ' + '\x1b[1m\x1b[31m' + uld.uld_no + '\x1b[0m' + '\n';
 
         for (const awb of uld.awbs) {
-          output += `\t ${format(awb.awb_no, 22)}${format(awb.pcs || 0, 10)}${format((awb.weight || 0).toFixed(2), 12)}${format(awb.destination || '', 20)}${format('0.00', 12)}${awb.shc || ''}\n`;
+          output += format(awb.awb_no, 18) +
+            format((awb.pcs || 0).toFixed(2), 10) +
+            format((awb.weight || 0).toFixed(2), 12) +
+            format(awb.destination || '', 18) +
+            format('0.00', 12) +
+            (awb.shc || '') + '\n';
+
           totalPCS += awb.pcs || 0;
           totalWeight += awb.weight || 0;
         }
 
+        output += '\n';
         totalULD++;
       }
 
-      output += `\n\n\tTOTAL ULD : ${totalULD}`.padEnd(32)
-              + format(totalPCS, 10)
-              + format(totalWeight.toFixed(2), 12)
-              + format('', 20)
-              + '0.00';
+      output += '\x1b[1m\x1b[4m\x1b[31mTOTAL ULD :\x1b[0m'.padEnd(20) +
+        String(totalULD).padEnd(10) +
+        '\x1b[1m\x1b[4:doublem' + format(totalPCS.toFixed(2), 12) +
+        format(totalWeight.toFixed(2), 12) +
+        format('', 18) +
+        format('0.00', 12) + '\x1b[0m';
 
       document.getElementById('report').innerText = output;
     }
 
-function savePDF() {
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-  const text = document.getElementById("report").textContent;
-
-  const margin = 10;
-  const pageHeight = doc.internal.pageSize.height;
-  const lineHeight = 4.5;
-  const lines = doc.splitTextToSize(text, 190);
-  let y = margin;
-
-  doc.setFont("Courier", "normal");
-  doc.setFontSize(10);
-
-  for (let i = 0; i < lines.length; i++) {
-    if (y + lineHeight > pageHeight - margin) {
-      doc.addPage();
-      y = margin;
+    function savePDF() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      const text = document.getElementById("report").textContent;
+      doc.setFont("Courier", "normal");
+      doc.setFontSize(10);
+      doc.text(text, 10, 10);
+      doc.save("Cargo_Summary.pdf");
     }
-    doc.text(lines[i], margin, y);
-    y += lineHeight;
-  }
-
-  doc.save("Cargo_Summary.pdf");
-}
-
 
     loadReport();
   </script>
-
 </body>
 </html>
