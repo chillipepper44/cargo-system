@@ -265,14 +265,14 @@
           document.getElementById("edit-std").value = convertTo24HrFormat(flight.std?.slice(0, 5));
           document.getElementById("flight-edit-modal").style.display = "block";
         };
-        const del = document.createElement('button');
-        del.innerText = '🗑️';
-        del.onclick = async () => {
-          if (confirm(`Delete flight ${flight.flight_no}?`)) {
-            await sb.from("flights").delete().eq("id", flight.id);
-            loadFlightsFromSupabase();
-          }
-        };
+const del = document.createElement('button');
+del.innerText = '🗑️';
+del.onclick = async () => {
+  if (confirm(`Delete flight ${flight.flight_no}?`)) {
+    await sb.from("flights").delete().eq("id", flight.id);
+    loadFlightsFromSupabase();
+  }
+};
         wrapper.appendChild(btn);
         wrapper.appendChild(edit);
         wrapper.appendChild(del);
