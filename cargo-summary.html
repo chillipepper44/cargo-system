@@ -146,30 +146,30 @@
       document.getElementById("report").innerHTML = output;
     }
 
-    function savePDF() {
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-      const text = document.getElementById("report").innerText;
-      const margin = 10;
-      const pageHeight = doc.internal.pageSize.height;
-      const lineHeight = 5;
-      const lines = doc.splitTextToSize(text, 190);
-      let y = margin;
+function savePDF() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+  });
 
-      doc.setFont("Courier", "normal");
-      doc.setFontSize(10);
+  const text = document.getElementById("report").textContent;
 
-      for (let i = 0; i < lines.length; i++) {
-        if (y + lineHeight > pageHeight - margin) {
-          doc.addPage();
-          y = margin;
-        }
-        doc.text(lines[i], margin, y);
-        y += lineHeight;
-      }
+  doc.setFont("courier", "normal"); // ✅ ใช้ Courier จริง
+  doc.setFontSize(10);
 
-      doc.save("Cargo_Summary.pdf");
-    }
+  // ป้องกัน text overflow ด้วย line wrap manual
+  const lines = text.split("\n");
+  let y = 10;
+  for (let line of lines) {
+    doc.text(line, 10, y);
+    y += 5; // ปรับระยะบรรทัด
+  }
+
+  doc.save("Cargo_Summary.pdf");
+}
+
 
     loadReport();
   </script>
