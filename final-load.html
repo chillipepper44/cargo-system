@@ -160,50 +160,64 @@
       window.location.href = 'cargo-summary.html';
     }
 
-    async function saveToSupabase() {
-      const { flight, day, monthText, year } = flightInfo;
-      const origin = "DMK";
-      const destination = "CGK";
-      const flightDate = `${year}-${monthTextToNumber(monthText)}-${day.padStart(2, '0')}`;
-      const stdTime = "00:00:00";
+async function saveToSupabase() {
+  const { flight, day, monthText, year } = flightInfo;
+  const origin = "DMK";
+  const destination = "CGK";
+  const flightDate = `${year}-${monthTextToNumber(monthText)}-${day.padStart(2, '0')}`;
+  const stdTime = "00:00:00";
 
-      const flightRes = await sb.from("flights").insert({
-        flight_no: flight,
-        flight_date: flightDate,
-        origin,
-        destination,
-        std: stdTime
-      }).select();
+  // ✅ ตรวจสอบก่อนว่า flight นี้มีอยู่แล้วไหม
+  const { data: existingFlight, error: flightCheckError } = await sb
+    .from("flights")
+    .select("id")
+    .eq("flight_no", flight)
+    .eq("flight_date", flightDate)
+    .maybeSingle();
 
-      const flightId = flightRes.data?.[0]?.id;
-      if (!flightId) return alert("❌ Failed to save flight.");
+  let flightId = existingFlight?.id;
 
-      for (const uldNo in uldMap) {
-        const uldRes = await sb.from("ulds").insert({
-          flight_id: flightId,
-          uld_no: uldNo,
-          reg: "",
-          shc: ""
-        }).select();
+  if (!flightId) {
+    // 🆕 ถ้ายังไม่มี ให้ insert ใหม่
+    const flightRes = await sb.from("flights").insert({
+      flight_no: flight,
+      flight_date: flightDate,
+      origin,
+      destination,
+      std: stdTime
+    }).select();
 
-        const uldId = uldRes.data?.[0]?.id;
-        if (!uldId) continue;
+    flightId = flightRes.data?.[0]?.id;
+  }
 
-        for (const awb of uldMap[uldNo]) {
-          await sb.from("awbs").insert({
-            uld_id: uldId,
-            awb_no: awb.awbNo,
-            pcs: parseInt(awb.qty),
-            weight: parseFloat(awb.weight),
-            destination: destination,
-            part: "",
-            shc: ""
-          });
-        }
-      }
+  if (!flightId) return alert("❌ Failed to save flight.");
 
-      alert("✅ Saved all data to Supabase!");
+  for (const uldNo in uldMap) {
+    const uldRes = await sb.from("ulds").insert({
+      flight_id: flightId,
+      uld_no: uldNo,
+      reg: "",
+      shc: ""
+    }).select();
+
+    const uldId = uldRes.data?.[0]?.id;
+    if (!uldId) continue;
+
+    for (const awb of uldMap[uldNo]) {
+      await sb.from("awbs").insert({
+        uld_id: uldId,
+        awb_no: awb.awbNo,
+        pcs: parseInt(awb.qty),
+        weight: parseFloat(awb.weight),
+        destination: destination,
+        part: "",
+        shc: ""
+      });
     }
+  }
+
+  alert("✅ Saved all data to Supabase!");
+}
 
     function monthTextToNumber(text) {
       const map = {
