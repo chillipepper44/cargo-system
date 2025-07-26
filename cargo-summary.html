@@ -3,97 +3,73 @@
 <head>
   <meta charset="UTF-8" />
   <title>Cargo Summary Report</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <style>
     body {
-      font-family: "Courier New", monospace;
-      background: #fff;
-      padding: 40px;
-      font-size: 12pt;
-      white-space: pre;
+      font-family: monospace;
+      background: white;
+      padding: 20px 50px;
     }
-
+    #content {
+      width: 794px; /* A4 width in px at 96dpi */
+    }
     .bold { font-weight: bold; }
-    .red { color: #d60000; }
+    .red { color: #a30000; }
     .underline { text-decoration: underline; }
     .double-underline {
-      border-bottom: 3px double black;
-      display: inline-block;
+      border-bottom: 3px double #000;
       padding-bottom: 2px;
-      line-height: 1.2;
+      display: inline-block;
     }
-
+    .line {
+      margin-bottom: 8px;
+    }
+    pre {
+      font-family: monospace;
+      white-space: pre;
+    }
     button {
-      margin: 10px 5px;
+      margin: 8px 4px;
       padding: 6px 12px;
-      border: none;
-      border-radius: 4px;
       background: #1976d2;
       color: white;
+      border: none;
+      border-radius: 4px;
       cursor: pointer;
     }
-
     @media print {
       button { display: none; }
     }
-
-    #report {
-      white-space: pre-wrap;
-    }
   </style>
-
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
 
-  <button onclick="window.print()">🖨️ Print</button>
-  <button onclick="savePDF()">💾 Save as PDF</button>
+  <button onclick="generatePDF()">💾 Save PDF</button>
+  <div id="content"></div>
 
-  <div id="report">Loading...</div>
-
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script>
-  const { createClient } = window.supabase;
-  const sb = createClient(
-    'https://xgaforpzjrievucwlgla.supabase.co',
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhnYWZvcnB6anJpZXZ1Y3dsZ2xhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM0NTEyMDQsImV4cCI6MjA2OTAyNzIwNH0.QPUOtbCPdxrqiWr93yp7FsxznzSyA_Je1oF4D65rzXs'
-  );
-
-  async function loadReport() {
-    const info = JSON.parse(localStorage.getItem('flightInfo'));
-    if (!info) return;
-
-    const { data, error } = await sb
-      .from("flights")
-      .select("*")
-      .eq("flight_no", info.flight)
-      .eq("flight_date", `${info.year}-${info.month}-${info.day}`);
-    
-    // ...
-  }
-
-  loadReport();
-
-    function pad(text, width) {
-      return text.toString().padEnd(width, ' ');
-    }
+  <script>
+    const sb = supabase.createClient(
+      'https://xgaforpzjrievucwlgla.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhnYWZvcnB6anJpZXZ1Y3dsZ2xhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM0NTEyMDQsImV4cCI6MjA2OTAyNzIwNH0.QPUOtbCPdxrqiWr93yp7FsxznzSyA_Je1oF4D65rzXs'
+    );
 
     async function loadReport() {
-      const info = JSON.parse(localStorage.getItem('flightInfo'));
-      if (!info) return;
+      const flightInfo = JSON.parse(localStorage.getItem("flightInfo"));
+      if (!flightInfo) return;
 
-      const flight_date = `${info.year}-${info.month}-${info.day}`;
-      const flight_no = info.flight;
+      const flight_date = `${flightInfo.year}-${flightInfo.month}-${flightInfo.day}`;
+      const flight_no = flightInfo.flight;
 
-      const { data: flightData } = await sb
+      const { data: flightData, error: flightError } = await sb
         .from("flights")
         .select("*")
         .eq("flight_no", flight_no)
         .eq("flight_date", flight_date)
         .limit(1);
 
-      if (!flightData?.length) {
-        document.getElementById("report").innerText = "❌ Flight not found.";
+      if (!flightData || flightData.length === 0) {
+        document.getElementById("content").innerText = "❌ Flight not found.";
         return;
       }
 
@@ -107,72 +83,49 @@
         .select("id, uld_no, awbs(*)")
         .eq("flight_id", flight.id);
 
-      let output = '';
+      let html = '';
+      html += `<div class="line bold">${flight_no}&emsp;&emsp;&emsp;&emsp;&emsp;${from}&emsp;${to}</div>`;
+      html += `<div class="line">${flight_date} ${std}&emsp;&emsp;&emsp;&emsp;&emsp;${flight_date} ${std}</div><br>`;
 
-      output += `<span class="bold">${pad(flight.flight_no, 16)}</span>\t${pad(from, 8)}${to}\n\n`;
-      output += `<span class="bold">${pad(flight_date + " " + std, 24)}</span>${flight_date} ${std}\n\n`;
-
-      output += `<span class="bold underline">${pad("MawbNo", 18)}${pad("Quantity", 10)}${pad("GrossWeigh", 12)}${pad("DestPortShipmen", 18)}${pad("Get Weight", 12)}SHC</span>\n\n`;
+      html += `<div class="line underline bold">MawbNo&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Quantity&nbsp;&nbsp;&nbsp;&nbsp;GrossWeigh&nbsp;&nbsp;&nbsp;DestPortShipmen&nbsp;&nbsp;&nbsp;&nbsp;Get Weight&nbsp;&nbsp;&nbsp;&nbsp;SHC</div><br>`;
 
       let totalULD = 0;
       let totalPCS = 0;
       let totalWeight = 0;
 
       for (const uld of ulds) {
-        output += `<span class="bold red underline">ULD NO</span> <span class="bold red">${uld.uld_no}</span>\n`;
+        html += `<div class="line bold red underline">ULD NO ${uld.uld_no}</div>`;
 
         for (const awb of uld.awbs) {
-          output += '  ' +
-            pad(awb.awb_no, 18) +
-            pad(awb.pcs || 0, 10) +
-            pad((awb.weight || 0).toFixed(2), 12) +
-            pad(awb.destination || '', 18) +
-            pad('0.00', 12) +
-            (awb.shc || '') + '\n';
-
-          totalPCS += awb.pcs || 0;
-          totalWeight += awb.weight || 0;
+          html += `<div class="line"><span class="bold red">&nbsp;&nbsp;${awb.awb_no.padEnd(18)}</span>${String(awb.pcs).padEnd(10)}${awb.weight.toFixed(2).padEnd(13)}${(awb.destination || '').padEnd(20)}${"0.00".padEnd(13)}${awb.shc || ''}</div>`;
+          totalPCS += awb.pcs;
+          totalWeight += awb.weight;
         }
 
-        output += '\n';
+        html += `<br>`;
         totalULD++;
       }
 
-      output += `<span class="bold red underline">TOTAL ULD :</span> ${pad(totalULD, 10)}`;
-      output += `<span class="bold double-underline">${pad(totalPCS, 12)}</span>`;
-      output += `<span class="bold double-underline">${pad(totalWeight.toFixed(2), 14)}</span>`;
-      output += `${pad("", 18)}<span class="bold double-underline">0.00</span>`;
+      html += `<div class="line bold red underline">TOTAL ULD :</div>`;
+      html += `<div class="line"><span class="bold">${String(totalULD).padEnd(10)}</span>
+               <span class="bold double-underline">${String(totalPCS).padEnd(10)}</span>
+               <span class="bold double-underline">${totalWeight.toFixed(2).padEnd(12)}</span></div>`;
 
-      document.getElementById("report").innerHTML = output;
+      document.getElementById("content").innerHTML = html;
     }
 
-function savePDF() {
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({
-    orientation: 'portrait',
-    unit: 'mm',
-    format: 'a4',
-  });
-
-  const text = document.getElementById("report").textContent;
-
-  doc.setFont("courier", "normal"); // ✅ ใช้ Courier จริง
-  doc.setFontSize(10);
-
-  // ป้องกัน text overflow ด้วย line wrap manual
-  const lines = text.split("\n");
-  let y = 10;
-  for (let line of lines) {
-    doc.text(line, 10, y);
-    y += 5; // ปรับระยะบรรทัด
-  }
-
-  doc.save("Cargo_Summary.pdf");
-}
-
+    function generatePDF() {
+      const element = document.getElementById("content");
+      html2pdf().set({
+        margin: 10,
+        filename: 'Cargo_Summary.pdf',
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: 'pt', format: 'a4', orientation: 'portrait' }
+      }).from(element).save();
+    }
 
     loadReport();
   </script>
-
 </body>
 </html>
