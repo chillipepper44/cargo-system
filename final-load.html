@@ -100,7 +100,65 @@
 
     const uldMap = {}; // { uldNo: [{awbNo, qty, weight}] }
 
-    // ... (rest of your functions remain the same)
+    function addAWB() {
+      const uldNo = document.getElementById('uldNo').value.trim().toUpperCase();
+      const awbNo = document.getElementById('awbNo').value.trim();
+      const qty = document.getElementById('qty').value.trim();
+      const weight = document.getElementById('weight').value.trim();
+
+      if (!uldNo || !awbNo || !qty || !weight) {
+        alert("Please fill all fields.");
+        return;
+      }
+
+      if (!uldMap[uldNo]) uldMap[uldNo] = [];
+      uldMap[uldNo].push({ awbNo, qty, weight });
+      renderULDs();
+
+      document.getElementById('awbNo').value = '';
+      document.getElementById('qty').value = '';
+      document.getElementById('weight').value = '';
+    }
+
+    function renderULDs() {
+      const area = document.getElementById('uldArea');
+      area.innerHTML = '';
+
+      Object.keys(uldMap).forEach(uld => {
+        const block = document.createElement('div');
+        block.className = 'uld-block';
+
+        const header = document.createElement('h3');
+        header.textContent = `ULD: ${uld}`;
+        block.appendChild(header);
+
+        const table = document.createElement('table');
+        table.innerHTML = `
+          <thead><tr><th>AWB No</th><th>PCS</th><th>Weight</th></tr></thead>
+          <tbody></tbody>
+        `;
+
+        const tbody = table.querySelector('tbody');
+        uldMap[uld].forEach(entry => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${entry.awbNo}</td>
+            <td>${entry.qty}</td>
+            <td>${entry.weight}</td>
+          `;
+          tbody.appendChild(row);
+        });
+
+        block.appendChild(table);
+        area.appendChild(block);
+      });
+    }
+
+    function goToSummary() {
+      localStorage.setItem('flightInfo', JSON.stringify(flightInfo));
+      localStorage.setItem('uldData', JSON.stringify(uldMap));
+      window.location.href = 'cargo-summary.html';
+    }
 
     async function saveToSupabase() {
       const { flight, day, monthText, year } = flightInfo;
@@ -145,6 +203,14 @@
       }
 
       alert("✅ Saved all data to Supabase!");
+    }
+
+    function monthTextToNumber(text) {
+      const map = {
+        JAN: "01", FEB: "02", MAR: "03", APR: "04", MAY: "05", JUN: "06",
+        JUL: "07", AUG: "08", SEP: "09", OCT: "10", NOV: "11", DEC: "12"
+      };
+      return map[text.toUpperCase()] || "01";
     }
   </script>
 </body>
