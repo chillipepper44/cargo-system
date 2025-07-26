@@ -45,7 +45,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
   <script>
-    const supabase = supabase.createClient(
+    const sb = supabase.createClient(
       'https://xgaforpzjrievucwlgla.supabase.co',
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhnYWZvcnB6anJpZXZ1Y3dsZ2xhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM0NTEyMDQsImV4cCI6MjA2OTAyNzIwNH0.QPUOtbCPdxrqiWr93yp7FsxznzSyA_Je1oF4D65rzXs'
     );
@@ -61,7 +61,7 @@
       const flight_date = `${info.year}-${info.month}-${info.day}`;
       const flight_no = info.flight;
 
-      const { data: flightData } = await supabase
+      const { data: flightData } = await sb
         .from("flights")
         .select("*")
         .eq("flight_no", flight_no)
@@ -78,51 +78,38 @@
       const from = flight.origin || 'DMK';
       const to = flight.destination || 'XXX';
 
-      const { data: ulds } = await supabase
+      const { data: ulds } = await sb
         .from("ulds")
         .select("id, uld_no, awbs(*)")
         .eq("flight_id", flight.id);
 
       let output = '';
-      output += format(`${flight.flight_no}`, 16) + format(from, 8) + to + '\n';
-      output += format(`${flight_date} ${std}`, 24) + `${flight_date} ${std}\n\n`;
+      output += `\t${flight.flight_no}\t\t\t${from}\t${to}\n\n`;
+      output += `\t${flight_date} ${std}\t\t${flight_date} ${std}\n\n`;
 
-      output += format("MawbNo", 18)
-              + format("Quantity", 10)
-              + format("GrossWeigh", 12)
-              + format("DestPortShipmen", 18)
-              + format("Get Weight", 12)
-              + "SHC\n\n";
+      output += `\tMawbNo\t\t\t\tQuantity  GrossWeigh  DestPortShipmen\tGet Weight   SHC\n\n`;
 
       let totalULD = 0;
       let totalPCS = 0;
       let totalWeight = 0;
 
       for (const uld of ulds) {
-        output += `ULD NO ${uld.uld_no}\n`;
+        output += `\n\tULD NO\t${uld.uld_no}\n`;
 
         for (const awb of uld.awbs) {
-          output += '  ' +
-            format(awb.awb_no, 18) +
-            format(awb.pcs || 0, 10) +
-            format((awb.weight || 0).toFixed(2), 12) +
-            format(awb.destination || '', 18) +
-            format('0.00', 12) +
-            (awb.shc || '') + '\n';
-
+          output += `\t ${format(awb.awb_no, 22)}${format(awb.pcs || 0, 10)}${format((awb.weight || 0).toFixed(2), 12)}${format(awb.destination || '', 20)}${format('0.00', 12)}${awb.shc || ''}\n`;
           totalPCS += awb.pcs || 0;
           totalWeight += awb.weight || 0;
         }
 
-        output += '\n';
         totalULD++;
       }
 
-      output += `TOTAL ULD : ${totalULD}`.padEnd(24)
+      output += `\n\n\tTOTAL ULD : ${totalULD}`.padEnd(32)
               + format(totalPCS, 10)
               + format(totalWeight.toFixed(2), 12)
-              + format('', 18)
-              + format('0.00', 12);
+              + format('', 20)
+              + '0.00';
 
       document.getElementById('report').innerText = output;
     }
